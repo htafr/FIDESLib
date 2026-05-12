@@ -3,6 +3,8 @@
 set -e
 set -x
 
+OPENFHE_CMAKE_EXTRA_ARGS=("${@:2}")
+
 #Remove previous installation.
 rm -rf openfhe-install
 rm -rf openfhe-src
@@ -22,6 +24,6 @@ git apply ../openfhe-1.4.2.patch
 mkdir build
 cd build
 echo "Installing into $1"
-cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX="$1" ..
+cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX="$1" -DWITH_NATIVEOPT=ON "${OPENFHE_CMAKE_EXTRA_ARGS[@]}" ..
 make -j12
 make install -j12
