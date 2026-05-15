@@ -1,3 +1,16 @@
+// Portions copyright(c) 2025 Universidad de Murcia
+// Portions copyright(c) 2026 LG Electronics, Inc.
+//
+//  Licensed under the MIT License (the "License"); you may not use this file
+//  except in compliance with the License.
+//
+//  You may obtain a copy of the License in the LICENSE file at the project
+//  root or at
+//
+//  https://mit-license.org/
+//
+//  SPDX-License-Identifier: MIT
+
 //
 // Created by carlosad on 24/04/24.
 //
@@ -66,12 +79,12 @@ std::map<OPS, int> op_count;
 
 Ciphertext::Ciphertext(Ciphertext&& ct_moved) noexcept
 : my_range(std::move(ct_moved.my_range)), keyID(std::move(ct_moved.keyID)), cc_(ct_moved.cc_), cc(*cc_), c0(std::move(ct_moved.c0)), c1(std::move(ct_moved.c1)),
-  NoiseFactor(ct_moved.NoiseFactor), NoiseLevel(ct_moved.NoiseLevel), slots(ct_moved.slots) {
+  NoiseFactor(ct_moved.NoiseFactor), NoiseLevel(ct_moved.NoiseLevel), slots(ct_moved.slots), c2(nullptr) {
 }
 
 Ciphertext::Ciphertext(Context& cc)
 : my_range(loc, LIFETIME), cc_((assert(cc != nullptr), CudaNvtxStart(std::string{ sc::current().function_name() }.substr()), cc)), cc(*cc_),
-  c0(cc->getAuxilarPoly()), c1(cc->getAuxilarPoly()) {
+  c0(cc->getAuxilarPoly()), c1(cc->getAuxilarPoly()), c2(nullptr) {
 	c0.dropToLevel(-1);
 	c1.dropToLevel(-1);
 	c0.SetModUp(false);
@@ -186,6 +199,8 @@ void Ciphertext::add(const Ciphertext& b) {
 		}
 	}
 
+	bool dropOccurred = false;
+
 	if (cc.rescaleTechnique == FLEXIBLEAUTO || cc.rescaleTechnique == FLEXIBLEAUTOEXT) {
 		assert(this->getLevel() == b.getLevel());
 	} else if (getLevel() > b.getLevel()) {
@@ -196,11 +211,24 @@ void Ciphertext::add(const Ciphertext& b) {
 		}
 		assert(this->getLevel() <= b.getLevel());
 		dropToLevel(b.getLevel());
+		dropOccurred = true;
 	}
 	op_count[OPS::ADD]++;
 
 	c0.add(b.c0);
 	c1.add(b.c1);
+
+	if (degree == 2 && b.degree == 2) {
+		assert(c2 && b.c2);
+		c2->add(*b.c2);
+	} else if (b.degree == 2) {
+		// this is degree-1, b is degree-2: promote this to degree-2
+		if (!c2)
+			c2 = std::make_unique<RNSPoly>(cc);
+		assert(b.c2);
+		c2->copy(*b.c2);
+		degree = 2;
+	}
 
 	this->addMetadata(*this, b);
 }
@@ -316,6 +344,7 @@ void Ciphertext::load(const RawCipherText& rawct) {
 	NoiseLevel	= rawct.NoiseLevel;
 	NoiseFactor = rawct.Noise;
 	slots		= rawct.slots;
+	degree		= 1;
 }
 
 void Ciphertext::store(RawCipherText& rawct) {
@@ -674,6 +703,144 @@ void Ciphertext::mult(const Ciphertext& b, bool rescale, const bool moddown) {
 	}
 
 	Out(KEYSWITCH, " finish ");
+}
+
+void Ciphertext::multNoRelin(const Ciphertext& b) {
+	CudaNvtxRange r(std::string{ std::source_location::current().function_name() }.substr(23 + strlen(loc)));
+
+	if (cc.rescaleTechnique == Context::FIXEDAUTO || cc.rescaleTechnique == Context::FLEXIBLEAUTO || cc.rescaleTechnique == Context::FLEXIBLEAUTOEXT) {
+		if (!adjustForMult(b)) {
+			Ciphertext b_(cc);
+			b_.copy(b);
+			if (b_.adjustForMult(*this))
+				multNoRelin(b_);
+			else
+				assert(false);
+			return;
+		}
+	}
+	assert(NoiseLevel == 1);
+	assert(NoiseLevel == b.NoiseLevel);
+	assert(c0.getLevel() <= b.c0.getLevel());
+	assert(c1.getLevel() <= b.c1.getLevel());
+
+	// Tensor product: (c0, c1) x (b.c0, b.c1) -> (d0, d1, d2)
+	// d0 = c0 * b.c0
+	// d1 = c0 * b.c1 + c1 * b.c0
+	// d2 = c1 * b.c1
+	// We compute d2 into c2, and compute d0, d1 into c0, c1
+
+	// c2 = c1 * b.c1
+	if (!c2)
+		c2 = std::make_unique<RNSPoly>(cc);
+	c2->grow(c1.getLevel());
+	c2->multElement(c1, b.c1);
+
+	// Tensor product cross-terms use c0, c1 on different streams.
+	// FIDESlib uses per-limb CUDA streams with proper stream ordering:
+	// multElement does s.wait(src1.s), s.wait(src2.s) at start and
+	// src.s.wait(s) at end. So no global sync is needed.
+	RNSPoly temp(cc, c1.getLevel());
+	temp.multElement(c0, b.c1); // temp = c0 * b.c1  (reads c0 on temp's stream)
+
+	// In-place overwrites: multElement's stream ordering ensures that
+	// c2.multElement reads c1 before we overwrite c1, and temp.multElement
+	// reads c0 before we overwrite c0. Both source streams are updated by
+	// the callee to wait on the destination stream.
+	c1.multElement(c1, b.c0); // c1 = old_c1 * b.c0  (in-place)
+	c0.multElement(c0, b.c0); // c0 = c0 * b.c0      (in-place)
+
+	c1.add(temp); // c1 = c0*b.c1 + c1*b.c0
+	// add() does temp.s.wait(c1.s) at end, so temp's destructor's
+	// cudaFreeAsync(temp.s) will wait for the add to complete.
+
+	// Manage metadata
+	NoiseLevel += b.NoiseLevel;
+	NoiseFactor *= b.NoiseFactor;
+	degree = 2;
+}
+
+void Ciphertext::multNoRelin(const Ciphertext& b, const Ciphertext& c) {
+	CudaNvtxRange r(std::string{ std::source_location::current().function_name() }.substr(23 + strlen(loc)));
+
+	if (this == &b && this == &c) {
+		// squareNoRelin would go here, but for now just do copy+multNoRelin
+		Ciphertext tmp(cc);
+		tmp.copy(b);
+		this->copy(b);
+		this->multNoRelin(tmp);
+	} else if (this == &b) {
+		this->multNoRelin(c);
+	} else if (this == &c) {
+		this->multNoRelin(b);
+	} else {
+		if (b.getLevel() <= c.getLevel()) {
+			this->copy(b);
+			this->multNoRelin(c);
+		} else {
+			this->copy(c);
+			this->multNoRelin(b);
+		}
+	}
+}
+
+void Ciphertext::relinearize(const KeySwitchingKey& kskEval) {
+	CudaNvtxRange r(std::string{ std::source_location::current().function_name() }.substr(23 + strlen(loc)));
+
+	assert(degree == 2 && c2 && "relinearize called on degree-1 ciphertext");
+
+	// Stream ordering: rotateModupDotKSK does s.wait(c0.s) and s.wait(c1.s)
+	// at its start, so it already waits for prior async GPU work on c0/c2.
+
+	// Key-switch c2 using the FUSED rotateModupDotKSK kernel.
+	//
+	// rotateModupDotKSK(c0_out, c1_in_out, ksk) does:
+	//   1. Reads source data from c1_in_out.limbptr  (the "c1" parameter)
+	//   2. INTTs + decomposes into this->DECOMP/DIGIT buffers
+	//   3. Key-switches:
+	//      - c1_in_out = <decomp, ksk.a>         (completely overwrites c1)
+	//      - c0_out    = c0_out * P + <decomp, ksk.b>  (READS c0_out first!)
+	//
+	// IMPORTANT: The kernel reads from c0_out.limbptr as INPUT to compute
+	//   res0 = c0_in * P + <decomp, ksk.b>
+	// In rotate(), c0 has the original ciphertext data, so after moddown the
+	// P scaling cancels out and we get c0_orig + KS_b(c1).
+	//
+	// For relinearization, we exploit this same mechanism:
+	//   - ks_a initialized with c2 data (source for INTT+decomp, overwritten with KS_a)
+	//   - ks_b initialized with c0 data (read by kernel as input, scaled by P,
+	//     combined with KS_b; after moddown → c0_orig + KS_b(c2))
+	//   - After moddown: ks_b already contains the final c0, ks_a contains KS_a(c2)
+	//   - c0 ← ks_b (copy), c1 += ks_a (add)
+
+	// Workspace poly for DECOMP/DIGIT — use singleton (same as rotate uses)
+	RNSPoly& aux = cc.getKeySwitchAux();
+
+	// Use c2 and c0 DIRECTLY as the key-switch operands (no temporaries needed):
+	//   - c2 serves as ks_a: contains source data for INTT+decomp; overwritten with KS_a(c2)
+	//   - c0 serves as ks_b: kernel reads it, scales by P, adds KS_b; after moddown → c0 + KS_b(c2)
+	// After relinearize, c2 is irrelevant (degree becomes 1), so overwriting it is fine.
+	// c0 naturally ends up with c0_orig + KS_b(c2) — exactly what we need.
+
+	// Fused INTT + decomp + key-switch (operates on c0/c2 directly)
+	aux.rotateModupDotKSK(c0, *c2, kskEval);
+
+	// Drop special prime limbs
+	c2->moddown(true, false); // c2 now holds KS_a(c2)
+	c0.moddown(true, false);  // c0 now holds c0_orig + KS_b(c2)
+
+	// c0 is already correct; fold KS_a into c1
+	c1.add(*c2);
+	// Stream ordering: c1.add(c2) does c2.s.wait(c1.s) at end, so c2's
+	// stream waits for the add to finish reading c2 data. Subsequent
+	// operations on c2 (grow/multElement in next multNoRelin) are ordered.
+
+	degree = 1;
+	// NOTE: We intentionally do NOT reset c2 here. Keeping the RNSPoly
+	// allocated avoids alloc/free churn in the lazy-relin pipeline
+	// (approach 102) where multNoRelin + relinearize are called repeatedly.
+	// The next multNoRelin will reuse the existing c2 allocation.
+	// c2 memory is freed when the Ciphertext is destroyed or load()'d.
 }
 
 void Ciphertext::square(bool rescale) {
@@ -1295,7 +1462,20 @@ void Ciphertext::copy(const Ciphertext& ciphertext) {
 	op_count[OPS::COPY]++;
 	c0.copy(ciphertext.c0);
 	c1.copy(ciphertext.c1);
+
+	if (ciphertext.degree == 2) {
+		if (!c2)
+			c2 = std::make_unique<RNSPoly>(cc);
+		assert(ciphertext.c2);
+		c2->copy(*ciphertext.c2);
+	}
+	// NOTE: When source is degree-1, we intentionally keep c2 allocated
+	// (if it exists) to avoid alloc/free churn in the lazy-relin pipeline.
+	// degree=1 ensures c2 won't be read.
+	// cudaDeviceSynchronize();
+
 	this->copyMetadata(ciphertext);
+	this->degree = ciphertext.degree;
 }
 
 void Ciphertext::multPt(const Ciphertext& c, const Plaintext& b, bool rescale) {

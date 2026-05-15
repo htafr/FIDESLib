@@ -1,3 +1,16 @@
+// Portions copyright(c) 2025 Universidad de Murcia
+// Portions copyright(c) 2026 LG Electronics, Inc.
+//
+//  Licensed under the MIT License (the "License"); you may not use this file
+//  except in compliance with the License.
+//
+//  You may obtain a copy of the License in the LICENSE file at the project
+//  root or at
+//
+//  https://mit-license.org/
+//
+//  SPDX-License-Identifier: MIT
+
 //
 // Created by oscar on 11/10/24.
 //
@@ -242,6 +255,13 @@ GeneralBenchParams gparams32_15_flexext{ .multDepth = 27, .scaleModSize = 28, .b
 
 GeneralBenchParams gparams64_17_flexext{ .multDepth = 23, .scaleModSize = 55, .batchSize = 8, .ringDim = 1 << 17, .dnum = 4, .GPUs = { 0 }, .tech = lbcrypto::FLEXIBLEAUTOEXT };
 
+GeneralBenchParams custom_11_45{ .multDepth = 15, // Must be > 11 to test at level 11
+	.scaleModSize							= 45,
+	.batchSize								= (1 << 15) / 2, // Maximum slots = ringDim/2 = 16,384 slots
+	.ringDim								= 1 << 15,		 // 32K ring dimension
+	.dnum									= 3,
+	.GPUs									= { 0 } };
+
 GeneralBenchParams gen_bench_params1 = gparams64_13;
 GeneralBenchParams gen_bench_params2 = gparams64_14;
 GeneralBenchParams gen_bench_params3 = gparams64_15;
@@ -291,7 +311,8 @@ std::array<FIDESlib::CKKS::Parameters, 9> fideslib_bench_params = { params32,
 	params64_14,
 	params64_15 };
 
-std::array<GeneralBenchParams, 32> general_bench_params = {
+std::array<GeneralBenchParams, 33> general_bench_params = {
+	custom_11_45,
 	gen_bench_params1,
 	gen_bench_params2,
 	gen_bench_params3,

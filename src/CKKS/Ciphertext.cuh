@@ -1,3 +1,16 @@
+// Portions copyright(c) 2025 Universidad de Murcia
+// Portions copyright(c) 2026 LG Electronics, Inc.
+//
+//  Licensed under the MIT License (the "License"); you may not use this file
+//  except in compliance with the License.
+//
+//  You may obtain a copy of the License in the LICENSE file at the project
+//  root or at
+//
+//  https://mit-license.org/
+//
+//  SPDX-License-Identifier: MIT
+
 //
 // Created by carlosad on 24/04/24.
 //
@@ -46,6 +59,11 @@ class Ciphertext {
 	ContextData& cc;
 	/** @brief The two polynomial components of the ciphertext (c0 and c1). */
 	RNSPoly c0, c1;
+	/** @brief  degree-2 component for lazy relinearization (allocated on demand) */
+	std::unique_ptr<RNSPoly> c2;
+	/** @brief ciphertext degree: 1 (normal) or 2 (after multNoRelin) */
+	int degree = 1;
+
 	/** @brief Accumulated noise factor for this ciphertext. */
 	double NoiseFactor = 0;
 	/** @brief Discrete noise level indicator. */
@@ -151,6 +169,25 @@ class Ciphertext {
 	 * @param rawct Destination object that will receive the serialized data.
 	 */
 	void store(RawCipherText& rawct);
+
+	/**
+	 * Multiply two ciphertexts WITHOUT relinearization (lazy relin).
+	 * Produces a degree-2 ciphertext with 3 components (c0, c1, c2).
+	 * The result can be accumulated with other degree-2 ciphertexts via add(),
+	 * and then relinearized once with relinearize().
+	 *
+	 * This saves one key-switching per multiplication when accumulating many products.
+	 * CPU equivalent: OpenFHE's EvalMultNoRelin.
+	 */
+	void multNoRelin(const Ciphertext& b);
+	void multNoRelin(const Ciphertext& b, const Ciphertext& c);
+
+	/**
+	 * Relinearize a degree-2 ciphertext back to degree-1.
+	 * Must be called before rotation, rescale, or download.
+	 * CPU equivalent: OpenFHE's RelinearizeInPlace.
+	 */
+	void relinearize(const KeySwitchingKey& kskEval);
 
 	/**
 	 * @brief Adds another ciphertext to *this* (in‑place).
@@ -525,6 +562,13 @@ class Ciphertext {
 	 * @param plaintext  Plaintext operand.
 	 */
 	void addPt(const Ciphertext& ciphertext, const Plaintext& plaintext);
+
+	/**
+	 * @brief Check if this ciphertext is degree-2 (needs relinearization)
+	 */
+	[[nodiscard]] bool isDegree2() const {
+		return degree == 2;
+	}
 
 	/**
 	 * @brief Reinterprets the internal data of `ciphertext` under the current context.

@@ -1,7 +1,19 @@
+// Portions copyright(c) 2025 Universidad de Murcia
+// Portions copyright(c) 2026 LG Electronics, Inc.
+//
+//  Licensed under the MIT License (the "License"); you may not use this file
+//  except in compliance with the License.
+//
+//  You may obtain a copy of the License in the LICENSE file at the project
+//  root or at
+//
+//  https://mit-license.org/
+//
+//  SPDX-License-Identifier: MIT
+
 //
 // Created by oscar on 21/10/24.
 //
-
 #include <benchmark/benchmark.h>
 
 #include "Benchmark.cuh"
@@ -137,6 +149,76 @@ BENCHMARK_DEFINE_F(GeneralFixture, AddScalar)(benchmark::State& state) {
 	CudaCheckErrorMod;
 }
 
+BENCHMARK_DEFINE_F(GeneralFixture, CiphertextAddCPU)(benchmark::State& state) {
+	fideslibParams.batch = state.range(2);
+
+	std::vector<double> x1 = { 0.25, 0.5, 0.75, 1.0, 2.0, 3.0, 4.0, 5.0 };
+	std::vector<double> x2 = { 0.25, 0.5, 0.75, 1.0, 2.0, 3.0, 4.0, 5.0 };
+
+	lbcrypto::Plaintext ptxt1 = cc->MakeCKKSPackedPlaintext(x1, 1, 0);
+	lbcrypto::Plaintext ptxt2 = cc->MakeCKKSPackedPlaintext(x2, 1, 0);
+
+	ptxt1->SetLevel(0);
+	ptxt2->SetLevel(0);
+	auto c1 = cc->Encrypt(keys.publicKey, ptxt1);
+	auto c2 = cc->Encrypt(keys.publicKey, ptxt2);
+
+	state.counters["p_batch"] = state.range(2);
+	for (auto _ : state) {
+		auto start			 = std::chrono::high_resolution_clock::now();
+		auto result			 = cc->EvalAdd(c1, c2);
+		auto end			 = std::chrono::high_resolution_clock::now();
+		auto elapsed_seconds = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start);
+		state.SetIterationTime(elapsed_seconds.count() * 1e-9);
+		benchmark::DoNotOptimize(result);
+	}
+}
+
+BENCHMARK_DEFINE_F(GeneralFixture, AddPlaintextCPU)(benchmark::State& state) {
+	fideslibParams.batch = state.range(2);
+
+	std::vector<double> x1 = { 0.25, 0.5, 0.75, 1.0, 2.0, 3.0, 4.0, 5.0 };
+	std::vector<double> x2 = { 0.25, 0.5, 0.75, 1.0, 2.0, 3.0, 4.0, 5.0 };
+
+	lbcrypto::Plaintext ptxt1 = cc->MakeCKKSPackedPlaintext(x1, 1, 0);
+	lbcrypto::Plaintext ptxt2 = cc->MakeCKKSPackedPlaintext(x2, 1, 0);
+
+	ptxt1->SetLevel(0);
+	ptxt2->SetLevel(0);
+	auto c1 = cc->Encrypt(keys.publicKey, ptxt1);
+
+	state.counters["p_batch"] = state.range(2);
+	for (auto _ : state) {
+		auto start			 = std::chrono::high_resolution_clock::now();
+		auto result			 = cc->EvalAdd(c1, ptxt2);
+		auto end			 = std::chrono::high_resolution_clock::now();
+		auto elapsed_seconds = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start);
+		state.SetIterationTime(elapsed_seconds.count() * 1e-9);
+		benchmark::DoNotOptimize(result);
+	}
+}
+
+BENCHMARK_DEFINE_F(GeneralFixture, AddScalarCPU)(benchmark::State& state) {
+	fideslibParams.batch = state.range(2);
+
+	std::vector<double> x1 = { 0.25, 0.5, 0.75, 1.0, 2.0, 3.0, 4.0, 5.0 };
+
+	lbcrypto::Plaintext ptxt1 = cc->MakeCKKSPackedPlaintext(x1, 1, 0);
+
+	ptxt1->SetLevel(0);
+	auto c1 = cc->Encrypt(keys.publicKey, ptxt1);
+
+	state.counters["p_batch"] = state.range(2);
+	for (auto _ : state) {
+		auto start			 = std::chrono::high_resolution_clock::now();
+		auto result			 = cc->EvalAdd(c1, 1.00123123);
+		auto end			 = std::chrono::high_resolution_clock::now();
+		auto elapsed_seconds = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start);
+		state.SetIterationTime(elapsed_seconds.count() * 1e-9);
+		benchmark::DoNotOptimize(result);
+	}
+}
+
 BENCHMARK_REGISTER_F(GeneralFixture, CiphertextAdd)->ArgsProduct({ PARAMETERS, { 0 }, BATCH_CONFIG, LEVEL_CONFIG });
 BENCHMARK_REGISTER_F(GeneralFixture, AddPlaintext)->ArgsProduct({ PARAMETERS, { 0 }, BATCH_CONFIG, LEVEL_CONFIG });
 BENCHMARK_REGISTER_F(GeneralFixture, AddScalar)->ArgsProduct({ PARAMETERS, { 0 }, BATCH_CONFIG, LEVEL_CONFIG });
@@ -147,4 +229,7 @@ BENCHMARK_REGISTER_F(GeneralFixture, CiphertextAdd)->ArgsProduct({ { 30, 31 }, {
 BENCHMARK_REGISTER_F(GeneralFixture, AddPlaintext)->ArgsProduct({ { 30, 31 }, { 0 }, BATCH_CONFIG, { 0, 12 } })->UseManualTime()->Iterations(10);
 BENCHMARK_REGISTER_F(GeneralFixture, AddScalar)->ArgsProduct({ { 30, 31 }, { 0 }, BATCH_CONFIG, { 0, 12 } })->UseManualTime()->Iterations(10);
 
+BENCHMARK_REGISTER_F(GeneralFixture, CiphertextAddCPU)->ArgsProduct({ { 0, 1, 2, 3 }, { 0 }, BATCH_CONFIG })->UseManualTime();
+BENCHMARK_REGISTER_F(GeneralFixture, AddPlaintextCPU)->ArgsProduct({ { 0, 1, 2, 3 }, { 0 }, BATCH_CONFIG })->UseManualTime();
+BENCHMARK_REGISTER_F(GeneralFixture, AddScalarCPU)->ArgsProduct({ { 0, 1, 2, 3 }, { 0 }, BATCH_CONFIG })->UseManualTime();
 } // namespace FIDESlib::Benchmarks

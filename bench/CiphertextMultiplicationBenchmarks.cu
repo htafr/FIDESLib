@@ -1,3 +1,16 @@
+// Portions copyright(c) 2025 Universidad de Murcia
+// Portions copyright(c) 2026 LG Electronics, Inc.
+//
+//  Licensed under the MIT License (the "License"); you may not use this file
+//  except in compliance with the License.
+//
+//  You may obtain a copy of the License in the LICENSE file at the project
+//  root or at
+//
+//  https://mit-license.org/
+//
+//  SPDX-License-Identifier: MIT
+
 //
 // Created by oscar on 21/10/24.
 //
@@ -25,8 +38,16 @@ BENCHMARK_DEFINE_F(GeneralFixture, CiphertextMultiplication)(benchmark::State& s
 	{
 		FIDESlib::CKKS::Context GPUcc = FIDESlib::CKKS::GenCryptoContextGPU(fideslibParams.adaptTo(raw_param), GPUs);
 
-		std::vector<double> x1 = { 0.25, 0.5, 0.75, 1.0, 2.0, 3.0, 4.0, 5.0 };
-		std::vector<double> x2 = { 0.25, 0.5, 0.75, 1.0, 2.0, 3.0, 4.0, 5.0 };
+		// Create vectors dynamically based on batch size for maximum slot utilization
+		size_t batch_size = static_cast<size_t>(state.range(2));
+		std::vector<double> x1, x2;
+		x1.reserve(batch_size);
+		x2.reserve(batch_size);
+
+		for (size_t i = 0; i < batch_size; ++i) {
+			x1.push_back(0.25 * (i + 1)); // Values: 0.25, 0.5, 0.75, 1.0, 1.25, ...
+			x2.push_back(0.5 * (i + 1));  // Values: 0.5, 1.0, 1.5, 2.0, 2.5, ...
+		}
 
 		lbcrypto::Plaintext ptxt1 = cc->MakeCKKSPackedPlaintext(x1, 1, state.range(3));
 		lbcrypto::Plaintext ptxt2 = cc->MakeCKKSPackedPlaintext(x2, 1, state.range(3));
@@ -97,7 +118,13 @@ BENCHMARK_DEFINE_F(GeneralFixture, CiphertextSquaring)(benchmark::State& state) 
 	FIDESlib::CKKS::RawParams raw_param = FIDESlib::CKKS::GetRawParams(cc);
 	FIDESlib::CKKS::Context GPUcc		= FIDESlib::CKKS::GenCryptoContextGPU(fideslibParams.adaptTo(raw_param), GPUs);
 
-	std::vector<double> x1 = { 0.25, 0.5, 0.75, 1.0, 2.0, 3.0, 4.0, 5.0 };
+	size_t batch_size = static_cast<size_t>(state.range(2));
+	std::vector<double> x1;
+	x1.reserve(batch_size);
+
+	for (size_t i = 0; i < batch_size; ++i) {
+		x1.push_back(0.25 * (i + 1)); // Values: 0.25, 0.5, 0.75, 1.0, 1.25, ...
+	}
 
 	lbcrypto::Plaintext ptxt1 = cc->MakeCKKSPackedPlaintext(x1, 1, state.range(3));
 
@@ -148,7 +175,13 @@ BENCHMARK_DEFINE_F(GeneralFixture, MultScalar)(benchmark::State& state) {
 	FIDESlib::CKKS::RawParams raw_param = FIDESlib::CKKS::GetRawParams(cc);
 	FIDESlib::CKKS::Context GPUcc		= FIDESlib::CKKS::GenCryptoContextGPU(fideslibParams.adaptTo(raw_param), GPUs);
 
-	std::vector<double> x1 = { 0.25, 0.5, 0.75, 1.0, 2.0, 3.0, 4.0, 5.0 };
+	size_t batch_size = static_cast<size_t>(state.range(2));
+	std::vector<double> x1;
+	x1.reserve(batch_size);
+
+	for (size_t i = 0; i < batch_size; ++i) {
+		x1.push_back(0.25 * (i + 1)); // Values: 0.25, 0.5, 0.75, 1.0, 1.25, ...
+	}
 
 	lbcrypto::Plaintext ptxt1 = cc->MakeCKKSPackedPlaintext(x1, 1, state.range(3));
 
@@ -179,9 +212,51 @@ BENCHMARK_DEFINE_F(GeneralFixture, MultScalar)(benchmark::State& state) {
 	CudaCheckErrorMod;
 }
 
+BENCHMARK_DEFINE_F(GeneralFixture, CiphertextMultiplicationCPU)(benchmark::State& state) {
+	if (this->generalTestParams.multDepth <= static_cast<uint64_t>(state.range(3))) {
+		state.SkipWithMessage("cc.L <= level");
+		return;
+	}
+
+	state.counters["p_batch"] = state.range(2);
+	state.counters["p_limbs"] = state.range(3);
+
+	// Create vectors dynamically based on batch size for maximum slot utilization
+	size_t batch_size = static_cast<size_t>(state.range(2));
+	std::vector<double> x1, x2;
+	x1.reserve(batch_size);
+	x2.reserve(batch_size);
+
+	for (size_t i = 0; i < batch_size; ++i) {
+		x1.push_back(0.25 * (i + 1)); // Values: 0.25, 0.5, 0.75, 1.0, 1.25, ...
+		x2.push_back(0.5 * (i + 1));  // Values: 0.5, 1.0, 1.5, 2.0, 2.5, ...
+	}
+
+	lbcrypto::Plaintext ptxt1 = cc->MakeCKKSPackedPlaintext(x1, 1, state.range(3));
+	lbcrypto::Plaintext ptxt2 = cc->MakeCKKSPackedPlaintext(x2, 1, state.range(3));
+
+	ptxt1->SetLevel(state.range(3));
+	ptxt2->SetLevel(state.range(3));
+	auto c1 = cc->Encrypt(keys.publicKey, ptxt1);
+	auto c2 = cc->Encrypt(keys.publicKey, ptxt2);
+
+	for (auto _ : state) {
+		auto ct1_clone = c1->Clone();
+		auto ct2_clone = c2->Clone();
+
+		auto start	= std::chrono::high_resolution_clock::now();
+		auto result = cc->EvalMult(ct1_clone, ct2_clone);
+		auto end	= std::chrono::high_resolution_clock::now();
+
+		auto elapsed = std::chrono::duration_cast<std::chrono::duration<double>>(end - start);
+		state.SetIterationTime(elapsed.count());
+	}
+}
+
 BENCHMARK_REGISTER_F(GeneralFixture, CiphertextMultiplication)->ArgsProduct({ PARAMETERS, { 0 }, BATCH_CONFIG, LEVEL_CONFIG });
 BENCHMARK_REGISTER_F(GeneralFixture, CiphertextSquaring)->ArgsProduct({ PARAMETERS, { 0 }, BATCH_CONFIG, LEVEL_CONFIG });
 BENCHMARK_REGISTER_F(GeneralFixture, MultScalar)->ArgsProduct({ PARAMETERS, { 0 }, BATCH_CONFIG, LEVEL_CONFIG });
+BENCHMARK_REGISTER_F(GeneralFixture, CiphertextMultiplicationCPU)->ArgsProduct({ { 0, 1, 2, 3, 6 }, { 0 }, BATCH_CONFIG, LEVEL_CONFIG })->UseManualTime();
 
 /// TDPS Experiments
 

@@ -1,3 +1,16 @@
+// Portions copyright(c) 2025 Universidad de Murcia
+// Portions copyright(c) 2026 LG Electronics, Inc.
+//
+//  Licensed under the MIT License (the "License"); you may not use this file
+//  except in compliance with the License.
+//
+//  You may obtain a copy of the License in the LICENSE file at the project
+//  root or at
+//
+//  https://mit-license.org/
+//
+//  SPDX-License-Identifier: MIT
+
 //
 // Created by oscar on 21/10/24.
 //
@@ -268,8 +281,94 @@ BENCHMARK_DEFINE_F(GeneralFixture, AdjustPlaintext)(benchmark::State& state) {
 	CudaCheckErrorMod;
 }
 
+BENCHMARK_DEFINE_F(GeneralFixture, MultPlaintextCPU)(benchmark::State& state) {
+	if (this->generalTestParams.multDepth <= static_cast<uint64_t>(state.range(3))) {
+		state.SkipWithMessage("cc.L <= level");
+		return;
+	}
+
+	fideslibParams.batch = state.range(2);
+
+	std::vector<double> x1 = { 0.25, 0.5, 0.75, 1.0, 2.0, 3.0, 4.0, 5.0 };
+
+	lbcrypto::Plaintext ptxt1 = cc->MakeCKKSPackedPlaintext(x1, 1, state.range(3));
+
+	auto c1 = cc->Encrypt(keys.publicKey, ptxt1);
+
+	state.counters["p_batch"] = state.range(2);
+	state.counters["p_limbs"] = state.range(3);
+
+	for (auto _ : state) {
+		auto start			 = std::chrono::high_resolution_clock::now();
+		auto result			 = cc->EvalMult(c1, ptxt1);
+		auto end			 = std::chrono::high_resolution_clock::now();
+		auto elapsed_seconds = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start);
+		state.SetIterationTime(elapsed_seconds.count() * 1e-9);
+		benchmark::DoNotOptimize(result);
+	}
+}
+
+BENCHMARK_DEFINE_F(GeneralFixture, MultScalarCPU)(benchmark::State& state) {
+	if (this->generalTestParams.multDepth <= static_cast<uint64_t>(state.range(3))) {
+		state.SkipWithMessage("cc.L <= level");
+		return;
+	}
+
+	fideslibParams.batch = state.range(2);
+
+	std::vector<double> x1 = { 0.25, 0.5, 0.75, 1.0, 2.0, 3.0, 4.0, 5.0 };
+
+	lbcrypto::Plaintext ptxt1 = cc->MakeCKKSPackedPlaintext(x1, 1, state.range(3));
+
+	auto c1 = cc->Encrypt(keys.publicKey, ptxt1);
+
+	state.counters["p_batch"] = state.range(2);
+	state.counters["p_limbs"] = state.range(3);
+
+	for (auto _ : state) {
+		auto start			 = std::chrono::high_resolution_clock::now();
+		auto result			 = cc->EvalMult(c1, 1.00123123);
+		auto end			 = std::chrono::high_resolution_clock::now();
+		auto elapsed_seconds = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start);
+		state.SetIterationTime(elapsed_seconds.count() * 1e-9);
+		benchmark::DoNotOptimize(result);
+	}
+}
+
+BENCHMARK_DEFINE_F(GeneralFixture, RescaleCPU)(benchmark::State& state) {
+	if (this->generalTestParams.multDepth <= static_cast<uint64_t>(state.range(3))) {
+		state.SkipWithMessage("cc.L <= level");
+		return;
+	}
+
+	fideslibParams.batch = state.range(2);
+
+	std::vector<double> x1 = { 0.25, 0.5, 0.75, 1.0, 2.0, 3.0, 4.0, 5.0 };
+
+	lbcrypto::Plaintext ptxt1 = cc->MakeCKKSPackedPlaintext(x1, 1, state.range(3));
+
+	auto c1 = cc->Encrypt(keys.publicKey, ptxt1);
+	// Make ciphertext have higher level for rescaling
+	auto c2 = cc->EvalMult(c1, ptxt1);
+
+	state.counters["p_batch"] = state.range(2);
+	state.counters["p_limbs"] = state.range(3);
+
+	for (auto _ : state) {
+		auto start			 = std::chrono::high_resolution_clock::now();
+		auto result			 = cc->Rescale(c2);
+		auto end			 = std::chrono::high_resolution_clock::now();
+		auto elapsed_seconds = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start);
+		state.SetIterationTime(elapsed_seconds.count() * 1e-9);
+		benchmark::DoNotOptimize(result);
+	}
+}
+
 BENCHMARK_REGISTER_F(GeneralFixture, MultPlaintext)->ArgsProduct({ PARAMETERS, { 0 }, BATCH_CONFIG, LEVEL_CONFIG })->UseManualTime();
 BENCHMARK_REGISTER_F(GeneralFixture, Rescale)->ArgsProduct({ PARAMETERS, { 0 }, BATCH_CONFIG, LEVEL_CONFIG })->UseManualTime();
+BENCHMARK_REGISTER_F(GeneralFixture, MultPlaintextCPU)->ArgsProduct({ { 0, 1, 2, 3 }, { 0 }, BATCH_CONFIG, LEVEL_CONFIG })->UseManualTime();
+BENCHMARK_REGISTER_F(GeneralFixture, MultScalarCPU)->ArgsProduct({ { 0, 1, 2, 3 }, { 0 }, BATCH_CONFIG, LEVEL_CONFIG })->UseManualTime();
+BENCHMARK_REGISTER_F(GeneralFixture, RescaleCPU)->ArgsProduct({ { 0, 1, 2, 3 }, { 0 }, BATCH_CONFIG, LEVEL_CONFIG })->UseManualTime();
 
 /// TDPS Experiments
 

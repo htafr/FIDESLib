@@ -1,3 +1,16 @@
+// Portions copyright(c) 2025 Universidad de Murcia
+// Portions copyright(c) 2026 LG Electronics, Inc.
+//
+//  Licensed under the MIT License (the "License"); you may not use this file
+//  except in compliance with the License.
+//
+//  You may obtain a copy of the License in the LICENSE file at the project
+//  root or at
+//
+//  https://mit-license.org/
+//
+//  SPDX-License-Identifier: MIT
+
 //
 // Created by oscar on 21/10/24.
 //
@@ -21,7 +34,7 @@ extern std::vector<FIDESlib::PrimeRecord> p64;
 extern std::vector<FIDESlib::PrimeRecord> sp64;
 
 #define BATCH_CONFIG \
-	{ 100 }
+	{ 100, 16384 }
 
 #define LEVEL_CONFIG \
 	{ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30 }
@@ -76,7 +89,7 @@ extern GeneralBenchParams gparams32_15;
 
 extern GeneralBenchParams gparams64_17;
 
-extern std::array<GeneralBenchParams, 32> general_bench_params;
+extern std::array<GeneralBenchParams, 33> general_bench_params;
 extern std::array<FIDESlib::CKKS::Parameters, 9> fideslib_bench_params;
 
 extern std::map<int, lbcrypto::CryptoContext<lbcrypto::DCRTPoly>> context_map;
