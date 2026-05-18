@@ -79,7 +79,7 @@ std::map<OPS, int> op_count;
 
 Ciphertext::Ciphertext(Ciphertext&& ct_moved) noexcept
 : my_range(std::move(ct_moved.my_range)), keyID(std::move(ct_moved.keyID)), cc_(ct_moved.cc_), cc(*cc_), c0(std::move(ct_moved.c0)), c1(std::move(ct_moved.c1)),
-  NoiseFactor(ct_moved.NoiseFactor), NoiseLevel(ct_moved.NoiseLevel), slots(ct_moved.slots), c2(nullptr) {
+  c2(nullptr), NoiseFactor(ct_moved.NoiseFactor), NoiseLevel(ct_moved.NoiseLevel), slots(ct_moved.slots) {
 }
 
 Ciphertext::Ciphertext(Context& cc)
@@ -199,7 +199,7 @@ void Ciphertext::add(const Ciphertext& b) {
 		}
 	}
 
-	bool dropOccurred = false;
+	// bool dropOccurred = false;
 
 	if (cc.rescaleTechnique == FLEXIBLEAUTO || cc.rescaleTechnique == FLEXIBLEAUTOEXT) {
 		assert(this->getLevel() == b.getLevel());
@@ -211,7 +211,7 @@ void Ciphertext::add(const Ciphertext& b) {
 		}
 		assert(this->getLevel() <= b.getLevel());
 		dropToLevel(b.getLevel());
-		dropOccurred = true;
+		// dropOccurred = true;
 	}
 	op_count[OPS::ADD]++;
 
@@ -708,9 +708,13 @@ void Ciphertext::mult(const Ciphertext& b, bool rescale, const bool moddown) {
 void Ciphertext::multNoRelin(const Ciphertext& b) {
 	CudaNvtxRange r(std::string{ std::source_location::current().function_name() }.substr(23 + strlen(loc)));
 
-	if (cc.rescaleTechnique == Context::FIXEDAUTO || cc.rescaleTechnique == Context::FLEXIBLEAUTO || cc.rescaleTechnique == Context::FLEXIBLEAUTOEXT) {
+	if (cc.rescaleTechnique == FIXEDAUTO || cc.rescaleTechnique == FLEXIBLEAUTO || cc.rescaleTechnique == FLEXIBLEAUTOEXT) {
 		if (!adjustForMult(b)) {
-			Ciphertext b_(cc);
+			// Create a non-owning shared_ptr pointing directly to the existing object's memory address.
+			// The lambda custom deleter empty body () -> {} ensures it does not attempt to free this->cc later.
+			std::shared_ptr<ContextData> context_ptr(&this->cc, [](ContextData*) {});
+			Ciphertext b_(context_ptr);
+
 			b_.copy(b);
 			if (b_.adjustForMult(*this))
 				multNoRelin(b_);
@@ -765,7 +769,12 @@ void Ciphertext::multNoRelin(const Ciphertext& b, const Ciphertext& c) {
 
 	if (this == &b && this == &c) {
 		// squareNoRelin would go here, but for now just do copy+multNoRelin
-		Ciphertext tmp(cc);
+
+		// Create a non-owning shared_ptr pointing directly to the existing object's memory address.
+		// The lambda custom deleter empty body () -> {} ensures it does not attempt to free this->cc later.
+		std::shared_ptr<ContextData> context_ptr(&this->cc, [](ContextData*) {});
+		Ciphertext tmp(context_ptr);
+
 		tmp.copy(b);
 		this->copy(b);
 		this->multNoRelin(tmp);
@@ -848,7 +857,8 @@ void Ciphertext::square(bool rescale) {
 	CKKS::SetCurrentContext(cc_);
 	Out(KEYSWITCH, " start ");
 
-	if (cc.rescaleTechnique == FLEXIBLEAUTO || cc.rescaleTechnique == FLEXIBLEAUTOEXT || cc.rescaleTechnique == FIXEDAUTO) {
+	if (cc.rescaleTechnique == RESCALE_TECHNIQUE::FLEXIBLEAUTO || cc.rescaleTechnique == RESCALE_TECHNIQUE::FLEXIBLEAUTOEXT ||
+	  cc.rescaleTechnique == RESCALE_TECHNIQUE::FIXEDAUTO) {
 
 		if (c0.isModUp() || c1.isModUp()) {
 			assert(NoiseLevel == 1);

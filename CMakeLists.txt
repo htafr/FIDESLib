@@ -1,3 +1,16 @@
+# Portions copyright (c) 2025 Universidad de Murcia
+# Portions copyright (c) 2026 LG Electronics, Inc.
+#
+# Licensed under the MIT License (the "License"); you may not use this file
+# except in compliance with the License.
+#
+# You may obtain a copy of the License in the LICENSE file at the project root
+# or at
+#
+# https://mit-license.org/
+#
+# SPDX-License-Identifier: MIT
+
 cmake_minimum_required(VERSION 3.25.2)
 cmake_policy(VERSION 3.21.3...3.30)
 
@@ -113,6 +126,11 @@ else ()
 endif ()
 
 ############### OpenFHE Configuration ###################
+
+# Always set the prefix for finding the patched OpenFHE 1.2.3 This ensures
+# find_package uses the local patched version, not system OpenFHE 1.3.0
+set(FIDESLIB_INSTALL_OPENFHE_PREFIX
+    "${CMAKE_CURRENT_SOURCE_DIR}/openfhe-install/lib/OpenFHE")
 
 # Default runs will not update nor install OpenFHE. Specify manually to install.
 if (FIDESLIB_INSTALL_OPENFHE)
