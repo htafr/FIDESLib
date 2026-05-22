@@ -17,6 +17,6 @@ BUILD/
 .vscode/
 .idea/
 
-deps/openfhe-install/
+**/openfhe-install/
 
 .cache/
