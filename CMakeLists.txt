@@ -159,8 +159,10 @@ endif()
 
 # Default runs will not update nor install OpenFHE. Specify manually to install.
 if(FIDESLIB_INSTALL_OPENFHE)
-  execute_process(COMMAND ./build.sh ${OPENFHE_INSTALL_PREFIX}
-                  WORKING_DIRECTORY "../deps" COMMAND_ERROR_IS_FATAL ANY)
+  execute_process(
+    COMMAND_ERROR_IS_FATAL ANY
+    COMMAND ./build.sh "${OPENFHE_INSTALL_PREFIX}"
+    WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/deps")
 endif()
 
 find_package(
