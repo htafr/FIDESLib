@@ -172,7 +172,8 @@ find_package(
   EXACT
   REQUIRED
   PATHS
-  "${OPENFHE_INSTALL_PREFIX}")
+  "${OPENFHE_INSTALL_PREFIX}"
+  NO_DEFAULT_PATH)
 
 option(BUILD_STATIC "Set to ON to include static versions of the library" ON)
 
