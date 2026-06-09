@@ -21,7 +21,7 @@ cmake_policy(VERSION 3.21.3...3.30)
 # Set target architectures.
 if(NOT DEFINED FIDESLIB_ARCH)
   set(FIDESLIB_ARCH
-      "70-real;75-real;80-real;86-real;89-real;90-real;90-virtual;100-real;120-real"
+      "70-real;75-real;80-real;86-real;89-real;90-real;90-virtual"
       CACHE STRING "Set the backend architecture target.")
 endif()
 
@@ -86,31 +86,31 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS ON)
 
-if (NOT DEFINED CMAKE_C_COMPILER AND DEFINED ENV{CC})
-    set(CMAKE_C_COMPILER "$ENV{CC}")
-endif ()
-if (NOT DEFINED CMAKE_CXX_COMPILER AND DEFINED ENV{CXX})
-    set(CMAKE_CXX_COMPILER "$ENV{CXX}")
-endif ()
+if(NOT DEFINED CMAKE_C_COMPILER AND DEFINED ENV{CC})
+  set(CMAKE_C_COMPILER "$ENV{CC}")
+endif()
+if(NOT DEFINED CMAKE_CXX_COMPILER AND DEFINED ENV{CXX})
+  set(CMAKE_CXX_COMPILER "$ENV{CXX}")
+endif()
 
 # ############## CUDA Configuration ###################
 
 # Set CUDA_PATH if not defined previously.
-if (NOT DEFINED CUDA_PATH)
-    if (DEFINED CUDAToolkit_ROOT)
-        set(CUDA_PATH "${CUDAToolkit_ROOT}")
-    elseif (DEFINED ENV{CUDA_PATH})
-        set(CUDA_PATH "$ENV{CUDA_PATH}")
-    elseif (DEFINED ENV{CUDA_HOME})
-        set(CUDA_PATH "$ENV{CUDA_HOME}")
-    else ()
-        set(CUDA_PATH "/usr/local/cuda")
-    endif ()
-endif ()
+if(NOT DEFINED CUDA_PATH)
+  if(DEFINED CUDAToolkit_ROOT)
+    set(CUDA_PATH "${CUDAToolkit_ROOT}")
+  elseif(DEFINED ENV{CUDA_PATH})
+    set(CUDA_PATH "$ENV{CUDA_PATH}")
+  elseif(DEFINED ENV{CUDA_HOME})
+    set(CUDA_PATH "$ENV{CUDA_HOME}")
+  else()
+    set(CUDA_PATH "/usr/local/cuda")
+  endif()
+endif()
 
-if (NOT DEFINED CMAKE_CUDA_COMPILER)
-    set(CMAKE_CUDA_COMPILER "${CUDA_PATH}/bin/nvcc")
-endif ()
+if(NOT DEFINED CMAKE_CUDA_COMPILER)
+  set(CMAKE_CUDA_COMPILER "${CUDA_PATH}/bin/nvcc")
+endif()
 
 # Check if CUDA is installed.
 if(NOT EXISTS "${CUDA_PATH}")
@@ -122,9 +122,9 @@ set(CMAKE_CUDA_ARCHITECTURES "${FIDESLIB_ARCH}")
 set(CMAKE_CUDA_STANDARD 20)
 set(CMAKE_CUDA_STANDARD_REQUIRED ON)
 set(CMAKE_CUDA_EXTENSIONS ON)
-if (NOT DEFINED CMAKE_CUDA_HOST_COMPILER AND DEFINED CMAKE_CXX_COMPILER)
-    set(CMAKE_CUDA_HOST_COMPILER "${CMAKE_CXX_COMPILER}")
-endif ()
+if(NOT DEFINED CMAKE_CUDA_HOST_COMPILER AND DEFINED CMAKE_CXX_COMPILER)
+  set(CMAKE_CUDA_HOST_COMPILER "${CMAKE_CXX_COMPILER}")
+endif()
 
 # ############### Project Definition ###################
 
