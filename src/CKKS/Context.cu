@@ -23,8 +23,15 @@ namespace FIDESlib::CKKS {
 std::atomic_uint64_t next_uid = 0;
 constexpr bool SPLIT_SPECIAL  = true;
 
-std::map<Parameters, std::shared_ptr<ContextData>> map_param_context;
-Context currentContext;
+using ContextCacheKey = std::pair<Parameters, std::vector<int>>;
+
+std::map<ContextCacheKey, std::shared_ptr<ContextData>> map_param_context;
+// Per-thread current context. Making this thread_local lets independent
+// single-GPU contexts (e.g. one database shard per GPU) run concurrently from
+// different host threads without racing on this pointer. For single-GPU
+// contexts FIDESlib::parallel_for uses num_threads(1), so every internal
+// dispatch body runs on the calling thread and observes the correct value.
+thread_local Context currentContext;
 
 // std::map<std::pair<Parameters, Parameters>, std::shared_ptr<std::map<KeyHash, KeySwitchingKey>>> map_param_switch;
 std::vector<std::pair<std::pair<Parameters, Parameters>, std::unique_ptr<std::map<KeyHash, KeySwitchingKey>>>> map_param_switch;
@@ -51,7 +58,12 @@ ContextData::ContextData(const Parameters& param_, const std::vector<int>& devs,
 	}
 #endif
 
-	if (map_param_context.contains(param)) {
+	// Only treat an existing cached context as a duplicate when it also targets
+	// the SAME set of GPUs. This allows several independent single-GPU contexts
+	// that share identical crypto Parameters but live on different devices
+	// (e.g. one database shard per GPU) to coexist instead of all collapsing
+	// onto the first device's context.
+	if (map_param_context.contains({ param, devs })) {
 		OK = false;
 		return;
 	}
@@ -930,17 +942,18 @@ void ContextData::clearParamSwitchKeys(const KeyHash& KeyID) {
 Context GenCryptoContextGPU(const Parameters& param, const std::vector<int>& devs) {
 
 	ContextData* data = new ContextData(param, devs);
+	ContextCacheKey cacheKey{ data->param, devs };
 	if (OK) {
 		// Context cc();
 		Context cc(data); //= std::make_shared<ContextData>(param, devs);
 		// Context cc;
 
-		map_param_context[data->param] = cc;
+		map_param_context[cacheKey] = cc;
 
 		// if (!currentContext)
 		SetCurrentContext(cc);
 	} else {
-		SetCurrentContext(map_param_context[data->param]);
+		SetCurrentContext(map_param_context[cacheKey]);
 		delete data;
 	}
 	Context res = GetCurrentContext();
@@ -948,14 +961,23 @@ Context GenCryptoContextGPU(const Parameters& param, const std::vector<int>& dev
 }
 
 void DeregisterCryptoContextGPU(const Parameters& param) {
-	map_param_context.erase(param);
+	for (auto it = map_param_context.begin(); it != map_param_context.end();) {
+		if (it->first.first == param) {
+			it = map_param_context.erase(it);
+		} else {
+			++it;
+		}
+	}
 	if (currentContext && currentContext->param == param) {
 		currentContext.reset();
 	}
 }
 
 void DeregisterCryptoContextGPU(Context cc) {
-	DeregisterCryptoContextGPU(cc->param);
+	map_param_context.erase({ cc->param, cc->GPUid });
+	if (currentContext == cc) {
+		currentContext.reset();
+	}
 }
 
 Context GetCurrentContext() {
@@ -969,13 +991,16 @@ void SetCurrentContext(Context& cc) {
 	if (cc != currentContext) {
 		CudaNvtxRange r(std::string{ sc::current().function_name() }.substr());
 		currentContext = cc;
-		if (currentContext) {
+		// Capture a local copy: when GPUid.size() > 1 the parallel_for body runs
+		// on OpenMP worker threads whose thread_local currentContext is not set.
+		Context cur = currentContext;
+		if (cur) {
 
-			parallel_for(0, currentContext->GPUid.size(), 1, [&](int i) {
-				// for (size_t i = 0; i < currentContext->GPUid.size(); ++i) {
-				cudaSetDevice(currentContext->GPUid[i]);
+			parallel_for(0, cur->GPUid.size(), 1, [&](int i) {
+				// for (size_t i = 0; i < cur->GPUid.size(); ++i) {
+				cudaSetDevice(cur->GPUid[i]);
 				// cudaDeviceSynchronize();
-				cudaMemcpyToSymbolAsync(FIDESlib::constants, &(currentContext->precom.constants[i]), sizeof(FIDESlib::Constants), 0, cudaMemcpyHostToDevice, 0);
+				cudaMemcpyToSymbolAsync(FIDESlib::constants, &(cur->precom.constants[i]), sizeof(FIDESlib::Constants), 0, cudaMemcpyHostToDevice, 0);
 				// cudaDeviceSynchronize();
 			});
 		}
