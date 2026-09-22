@@ -15,9 +15,9 @@ VectorGPU<T>::VectorGPU(T* data, const int size, const int device, const int off
 : data(data + offset), size(size), device(device), managed(false), freeing(true) {
 	assert(data != nullptr);
 	{
-		cudaPointerAttributes att{};
-		cudaPointerGetAttributes(&att, data);
-		assert(att.type == cudaMemoryTypeManaged || att.type == cudaMemoryTypeDevice);
+		hipPointerAttribute_t att{};
+		hipPointerGetAttributes(&att, data);
+		assert(att.type == hipMemoryTypeManaged || att.type == hipMemoryTypeDevice);
 		assert(att.device == this->device);
 	}
 	CudaCheckErrorModNoSync;
@@ -49,13 +49,13 @@ VectorGPU<T>::VectorGPU(Stream& stream, const int size, const int device, const 
 	assert(device >= 0);
 	{
 		int device_count = -1;
-		assert(cudaGetDeviceCount(&device_count) == cudaSuccess);
+		assert(hipGetDeviceCount(&device_count) == hipSuccess);
 		assert(device < device_count);
 		(void)device_count;
 	}
 	{
 		int dev = -1;
-		assert(cudaGetDevice(&dev) == cudaSuccess);
+		assert(hipGetDevice(&dev) == hipSuccess);
 		assert(dev == device);
 		(void)dev;
 		// cudaSetDevice(device);
@@ -72,7 +72,7 @@ VectorGPU<T>::VectorGPU(Stream& stream, const int size, const int device, const 
 		// cudaMallocAsync(&data, bytes, stream.ptr());
 
 		if (src != nullptr) {
-			cudaMemcpyAsync(data, src, bytes, cudaMemcpyHostToDevice, stream.ptr());
+			hipMemcpyAsync(data, src, bytes, hipMemcpyHostToDevice, stream.ptr());
 		}
 	}
 	Out(MEMORY, "Managed vector construct OK");

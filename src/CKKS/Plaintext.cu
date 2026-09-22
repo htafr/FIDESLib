@@ -1,3 +1,4 @@
+#include "hip/hip_runtime.h"
 //
 // Created by carlosad on 25/04/24.
 //
@@ -85,7 +86,7 @@ void Plaintext::load(const RawPlainText& raw) {
 void Plaintext::store(RawPlainText& raw) {
 	CudaNvtxRange r(std::string{ sc::current().function_name() }.substr());
 	CKKS::SetCurrentContext(cc_);
-	cudaDeviceSynchronize();
+	hipDeviceSynchronize();
 
 	raw.numRes = c0.getLevel() + 1;
 	raw.sub_0.resize(raw.numRes);
@@ -96,7 +97,7 @@ void Plaintext::store(RawPlainText& raw) {
 	raw.Noise	   = NoiseFactor;
 	raw.NoiseLevel = NoiseLevel;
 	raw.slots	   = slots;
-	cudaDeviceSynchronize();
+	hipDeviceSynchronize();
 }
 
 void Plaintext::moddown() {

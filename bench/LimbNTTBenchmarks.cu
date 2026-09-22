@@ -1,3 +1,4 @@
+#include "hip/hip_runtime.h"
 //
 // Created by oscar on 22/10/24.
 //
@@ -9,7 +10,7 @@
 namespace FIDESlib::Benchmarks {
 BENCHMARK_DEFINE_F(FIDESlibFixture, LimbINTT32)(benchmark::State& state) {
 	int devcount = -1;
-	cudaGetDeviceCount(&devcount);
+	hipGetDeviceCount(&devcount);
 
 	std::vector<int> GPUs;
 	for (int i = 0; i < devcount; ++i)
@@ -17,7 +18,7 @@ BENCHMARK_DEFINE_F(FIDESlibFixture, LimbINTT32)(benchmark::State& state) {
 
 	CudaCheckErrorMod;
 	FIDESlib::CKKS::Context cc = FIDESlib::CKKS::GenCryptoContextGPU(fideslibParams, GPUs);
-	cudaSetDevice(GPUs[0]);
+	hipSetDevice(GPUs[0]);
 	FIDESlib::Stream s;
 	s.init();
 
@@ -36,7 +37,7 @@ BENCHMARK_DEFINE_F(FIDESlibFixture, LimbINTT32)(benchmark::State& state) {
 
 BENCHMARK_DEFINE_F(FIDESlibFixture, LimbNTT32)(benchmark::State& state) {
 	int devcount = -1;
-	cudaGetDeviceCount(&devcount);
+	hipGetDeviceCount(&devcount);
 
 	std::vector<int> GPUs;
 	for (int i = 0; i < devcount; ++i)
@@ -44,7 +45,7 @@ BENCHMARK_DEFINE_F(FIDESlibFixture, LimbNTT32)(benchmark::State& state) {
 
 	CudaCheckErrorMod;
 	FIDESlib::CKKS::Context cc = FIDESlib::CKKS::GenCryptoContextGPU(fideslibParams, GPUs);
-	cudaSetDevice(GPUs[0]);
+	hipSetDevice(GPUs[0]);
 	FIDESlib::Stream s;
 	s.init();
 
@@ -63,7 +64,7 @@ BENCHMARK_DEFINE_F(FIDESlibFixture, LimbNTT32)(benchmark::State& state) {
 
 BENCHMARK_DEFINE_F(FIDESlibFixture, LimbNothingINTT32)(benchmark::State& state) {
 	int devcount = -1;
-	cudaGetDeviceCount(&devcount);
+	hipGetDeviceCount(&devcount);
 
 	std::vector<int> GPUs;
 	for (int i = 0; i < devcount; ++i)
@@ -71,7 +72,7 @@ BENCHMARK_DEFINE_F(FIDESlibFixture, LimbNothingINTT32)(benchmark::State& state) 
 
 	CudaCheckErrorMod;
 	FIDESlib::CKKS::Context cc = FIDESlib::CKKS::GenCryptoContextGPU(fideslibParams, GPUs);
-	cudaSetDevice(GPUs[0]);
+	hipSetDevice(GPUs[0]);
 	FIDESlib::Stream s;
 	s.init();
 
@@ -90,7 +91,7 @@ BENCHMARK_DEFINE_F(FIDESlibFixture, LimbNothingINTT32)(benchmark::State& state) 
 
 BENCHMARK_DEFINE_F(FIDESlibFixture, LimbNothingNTT32)(benchmark::State& state) {
 	int devcount = -1;
-	cudaGetDeviceCount(&devcount);
+	hipGetDeviceCount(&devcount);
 
 	std::vector<int> GPUs;
 	for (int i = 0; i < devcount; ++i)
@@ -98,7 +99,7 @@ BENCHMARK_DEFINE_F(FIDESlibFixture, LimbNothingNTT32)(benchmark::State& state) {
 
 	CudaCheckErrorMod;
 	FIDESlib::CKKS::Context cc = FIDESlib::CKKS::GenCryptoContextGPU(fideslibParams, GPUs);
-	cudaSetDevice(GPUs[0]);
+	hipSetDevice(GPUs[0]);
 	FIDESlib::Stream s;
 	s.init();
 
@@ -117,7 +118,7 @@ BENCHMARK_DEFINE_F(FIDESlibFixture, LimbNothingNTT32)(benchmark::State& state) {
 
 BENCHMARK_DEFINE_F(FIDESlibFixture, LimbShoupINTT32)(benchmark::State& state) {
 	int devcount = -1;
-	cudaGetDeviceCount(&devcount);
+	hipGetDeviceCount(&devcount);
 
 	std::vector<int> GPUs;
 	for (int i = 0; i < devcount; ++i)
@@ -125,7 +126,7 @@ BENCHMARK_DEFINE_F(FIDESlibFixture, LimbShoupINTT32)(benchmark::State& state) {
 
 	CudaCheckErrorMod;
 	FIDESlib::CKKS::Context cc = FIDESlib::CKKS::GenCryptoContextGPU(fideslibParams, GPUs);
-	cudaSetDevice(GPUs[0]);
+	hipSetDevice(GPUs[0]);
 	FIDESlib::Stream s;
 	s.init();
 
@@ -144,7 +145,7 @@ BENCHMARK_DEFINE_F(FIDESlibFixture, LimbShoupINTT32)(benchmark::State& state) {
 
 BENCHMARK_DEFINE_F(FIDESlibFixture, LimbShoupNTT32)(benchmark::State& state) {
 	int devcount = -1;
-	cudaGetDeviceCount(&devcount);
+	hipGetDeviceCount(&devcount);
 
 	std::vector<int> GPUs;
 	for (int i = 0; i < devcount; ++i)
@@ -152,7 +153,7 @@ BENCHMARK_DEFINE_F(FIDESlibFixture, LimbShoupNTT32)(benchmark::State& state) {
 
 	CudaCheckErrorMod;
 	FIDESlib::CKKS::Context cc = FIDESlib::CKKS::GenCryptoContextGPU(fideslibParams, GPUs);
-	cudaSetDevice(GPUs[0]);
+	hipSetDevice(GPUs[0]);
 	FIDESlib::Stream s;
 	s.init();
 
@@ -171,7 +172,7 @@ BENCHMARK_DEFINE_F(FIDESlibFixture, LimbShoupNTT32)(benchmark::State& state) {
 
 BENCHMARK_DEFINE_F(FIDESlibFixture, LimbBarretINTT32)(benchmark::State& state) {
 	int devcount = -1;
-	cudaGetDeviceCount(&devcount);
+	hipGetDeviceCount(&devcount);
 
 	std::vector<int> GPUs;
 	for (int i = 0; i < devcount; ++i)
@@ -179,7 +180,7 @@ BENCHMARK_DEFINE_F(FIDESlibFixture, LimbBarretINTT32)(benchmark::State& state) {
 
 	CudaCheckErrorMod;
 	FIDESlib::CKKS::Context cc = FIDESlib::CKKS::GenCryptoContextGPU(fideslibParams, GPUs);
-	cudaSetDevice(GPUs[0]);
+	hipSetDevice(GPUs[0]);
 	FIDESlib::Stream s;
 	s.init();
 
@@ -198,7 +199,7 @@ BENCHMARK_DEFINE_F(FIDESlibFixture, LimbBarretINTT32)(benchmark::State& state) {
 
 BENCHMARK_DEFINE_F(FIDESlibFixture, LimbBarretNTT32)(benchmark::State& state) {
 	int devcount = -1;
-	cudaGetDeviceCount(&devcount);
+	hipGetDeviceCount(&devcount);
 
 	std::vector<int> GPUs;
 	for (int i = 0; i < devcount; ++i)
@@ -206,7 +207,7 @@ BENCHMARK_DEFINE_F(FIDESlibFixture, LimbBarretNTT32)(benchmark::State& state) {
 
 	CudaCheckErrorMod;
 	FIDESlib::CKKS::Context cc = FIDESlib::CKKS::GenCryptoContextGPU(fideslibParams, GPUs);
-	cudaSetDevice(GPUs[0]);
+	hipSetDevice(GPUs[0]);
 	FIDESlib::Stream s;
 	s.init();
 
@@ -225,7 +226,7 @@ BENCHMARK_DEFINE_F(FIDESlibFixture, LimbBarretNTT32)(benchmark::State& state) {
 
 BENCHMARK_DEFINE_F(FIDESlibFixture, LimbFP64Accel53bitINTT32)(benchmark::State& state) {
 	int devcount = -1;
-	cudaGetDeviceCount(&devcount);
+	hipGetDeviceCount(&devcount);
 
 	std::vector<int> GPUs;
 	for (int i = 0; i < devcount; ++i)
@@ -233,7 +234,7 @@ BENCHMARK_DEFINE_F(FIDESlibFixture, LimbFP64Accel53bitINTT32)(benchmark::State& 
 
 	CudaCheckErrorMod;
 	FIDESlib::CKKS::Context cc = FIDESlib::CKKS::GenCryptoContextGPU(fideslibParams, GPUs);
-	cudaSetDevice(GPUs[0]);
+	hipSetDevice(GPUs[0]);
 	FIDESlib::Stream s;
 	s.init();
 
@@ -252,7 +253,7 @@ BENCHMARK_DEFINE_F(FIDESlibFixture, LimbFP64Accel53bitINTT32)(benchmark::State& 
 
 BENCHMARK_DEFINE_F(FIDESlibFixture, LimbFP64Accel53bitNTT32)(benchmark::State& state) {
 	int devcount = -1;
-	cudaGetDeviceCount(&devcount);
+	hipGetDeviceCount(&devcount);
 
 	std::vector<int> GPUs;
 	for (int i = 0; i < devcount; ++i)
@@ -260,7 +261,7 @@ BENCHMARK_DEFINE_F(FIDESlibFixture, LimbFP64Accel53bitNTT32)(benchmark::State& s
 
 	CudaCheckErrorMod;
 	FIDESlib::CKKS::Context cc = FIDESlib::CKKS::GenCryptoContextGPU(fideslibParams, GPUs);
-	cudaSetDevice(GPUs[0]);
+	hipSetDevice(GPUs[0]);
 	FIDESlib::Stream s;
 	s.init();
 
@@ -290,7 +291,7 @@ BENCHMARK_REGISTER_F(FIDESlibFixture, LimbFP64Accel53bitNTT32)->ArgsProduct({ { 
 
 BENCHMARK_DEFINE_F(FIDESlibFixture, LimbINTT64)(benchmark::State& state) {
 	int devcount = -1;
-	cudaGetDeviceCount(&devcount);
+	hipGetDeviceCount(&devcount);
 
 	std::vector<int> GPUs;
 	for (int i = 0; i < devcount; ++i)
@@ -300,7 +301,7 @@ BENCHMARK_DEFINE_F(FIDESlibFixture, LimbINTT64)(benchmark::State& state) {
 
 	FIDESlib::CKKS::Context cc = FIDESlib::CKKS::GenCryptoContextGPU(fideslibParams, GPUs);
 
-	cudaSetDevice(GPUs[0]);
+	hipSetDevice(GPUs[0]);
 	FIDESlib::Stream s;
 	s.init();
 
@@ -322,7 +323,7 @@ BENCHMARK_DEFINE_F(FIDESlibFixture, LimbINTT64)(benchmark::State& state) {
 
 BENCHMARK_DEFINE_F(FIDESlibFixture, LimbNTT64)(benchmark::State& state) {
 	int devcount = -1;
-	cudaGetDeviceCount(&devcount);
+	hipGetDeviceCount(&devcount);
 
 	std::vector<int> GPUs;
 	for (int i = 0; i < devcount; ++i)
@@ -332,7 +333,7 @@ BENCHMARK_DEFINE_F(FIDESlibFixture, LimbNTT64)(benchmark::State& state) {
 
 	FIDESlib::CKKS::Context cc = FIDESlib::CKKS::GenCryptoContextGPU(fideslibParams, GPUs);
 
-	cudaSetDevice(GPUs[0]);
+	hipSetDevice(GPUs[0]);
 	FIDESlib::Stream s;
 	s.init();
 
@@ -354,7 +355,7 @@ BENCHMARK_DEFINE_F(FIDESlibFixture, LimbNTT64)(benchmark::State& state) {
 
 BENCHMARK_DEFINE_F(FIDESlibFixture, LimbNothingINTT64)(benchmark::State& state) {
 	int devcount = -1;
-	cudaGetDeviceCount(&devcount);
+	hipGetDeviceCount(&devcount);
 
 	std::vector<int> GPUs;
 	for (int i = 0; i < devcount; ++i)
@@ -364,7 +365,7 @@ BENCHMARK_DEFINE_F(FIDESlibFixture, LimbNothingINTT64)(benchmark::State& state) 
 
 	FIDESlib::CKKS::Context cc = FIDESlib::CKKS::GenCryptoContextGPU(fideslibParams, GPUs);
 
-	cudaSetDevice(GPUs[0]);
+	hipSetDevice(GPUs[0]);
 	FIDESlib::Stream s;
 	s.init();
 
@@ -386,7 +387,7 @@ BENCHMARK_DEFINE_F(FIDESlibFixture, LimbNothingINTT64)(benchmark::State& state) 
 
 BENCHMARK_DEFINE_F(FIDESlibFixture, LimbNothingNTT64)(benchmark::State& state) {
 	int devcount = -1;
-	cudaGetDeviceCount(&devcount);
+	hipGetDeviceCount(&devcount);
 
 	std::vector<int> GPUs;
 	for (int i = 0; i < devcount; ++i)
@@ -396,7 +397,7 @@ BENCHMARK_DEFINE_F(FIDESlibFixture, LimbNothingNTT64)(benchmark::State& state) {
 
 	FIDESlib::CKKS::Context cc = FIDESlib::CKKS::GenCryptoContextGPU(fideslibParams, GPUs);
 
-	cudaSetDevice(GPUs[0]);
+	hipSetDevice(GPUs[0]);
 	FIDESlib::Stream s;
 	s.init();
 
@@ -418,7 +419,7 @@ BENCHMARK_DEFINE_F(FIDESlibFixture, LimbNothingNTT64)(benchmark::State& state) {
 
 BENCHMARK_DEFINE_F(FIDESlibFixture, LimbShoupINTT64)(benchmark::State& state) {
 	int devcount = -1;
-	cudaGetDeviceCount(&devcount);
+	hipGetDeviceCount(&devcount);
 
 	std::vector<int> GPUs;
 	for (int i = 0; i < devcount; ++i)
@@ -428,7 +429,7 @@ BENCHMARK_DEFINE_F(FIDESlibFixture, LimbShoupINTT64)(benchmark::State& state) {
 
 	FIDESlib::CKKS::Context cc = FIDESlib::CKKS::GenCryptoContextGPU(fideslibParams, GPUs);
 
-	cudaSetDevice(GPUs[0]);
+	hipSetDevice(GPUs[0]);
 	FIDESlib::Stream s;
 	s.init();
 
@@ -450,7 +451,7 @@ BENCHMARK_DEFINE_F(FIDESlibFixture, LimbShoupINTT64)(benchmark::State& state) {
 
 BENCHMARK_DEFINE_F(FIDESlibFixture, LimbShoupNTT64)(benchmark::State& state) {
 	int devcount = -1;
-	cudaGetDeviceCount(&devcount);
+	hipGetDeviceCount(&devcount);
 
 	std::vector<int> GPUs;
 	for (int i = 0; i < devcount; ++i)
@@ -460,7 +461,7 @@ BENCHMARK_DEFINE_F(FIDESlibFixture, LimbShoupNTT64)(benchmark::State& state) {
 
 	FIDESlib::CKKS::Context cc = FIDESlib::CKKS::GenCryptoContextGPU(fideslibParams, GPUs);
 
-	cudaSetDevice(GPUs[0]);
+	hipSetDevice(GPUs[0]);
 	FIDESlib::Stream s;
 	s.init();
 
@@ -482,7 +483,7 @@ BENCHMARK_DEFINE_F(FIDESlibFixture, LimbShoupNTT64)(benchmark::State& state) {
 
 BENCHMARK_DEFINE_F(FIDESlibFixture, LimbBarretINTT64)(benchmark::State& state) {
 	int devcount = -1;
-	cudaGetDeviceCount(&devcount);
+	hipGetDeviceCount(&devcount);
 
 	std::vector<int> GPUs;
 	for (int i = 0; i < devcount; ++i)
@@ -492,7 +493,7 @@ BENCHMARK_DEFINE_F(FIDESlibFixture, LimbBarretINTT64)(benchmark::State& state) {
 
 	FIDESlib::CKKS::Context cc = FIDESlib::CKKS::GenCryptoContextGPU(fideslibParams, GPUs);
 
-	cudaSetDevice(GPUs[0]);
+	hipSetDevice(GPUs[0]);
 	FIDESlib::Stream s;
 	s.init();
 
@@ -514,7 +515,7 @@ BENCHMARK_DEFINE_F(FIDESlibFixture, LimbBarretINTT64)(benchmark::State& state) {
 
 BENCHMARK_DEFINE_F(FIDESlibFixture, LimbBarretNTT64)(benchmark::State& state) {
 	int devcount = -1;
-	cudaGetDeviceCount(&devcount);
+	hipGetDeviceCount(&devcount);
 
 	std::vector<int> GPUs;
 	for (int i = 0; i < devcount; ++i)
@@ -524,7 +525,7 @@ BENCHMARK_DEFINE_F(FIDESlibFixture, LimbBarretNTT64)(benchmark::State& state) {
 
 	FIDESlib::CKKS::Context cc = FIDESlib::CKKS::GenCryptoContextGPU(fideslibParams, GPUs);
 
-	cudaSetDevice(GPUs[0]);
+	hipSetDevice(GPUs[0]);
 	FIDESlib::Stream s;
 	s.init();
 
@@ -546,7 +547,7 @@ BENCHMARK_DEFINE_F(FIDESlibFixture, LimbBarretNTT64)(benchmark::State& state) {
 
 BENCHMARK_DEFINE_F(FIDESlibFixture, LimbFP64Accel53bitINTT64)(benchmark::State& state) {
 	int devcount = -1;
-	cudaGetDeviceCount(&devcount);
+	hipGetDeviceCount(&devcount);
 
 	std::vector<int> GPUs;
 	for (int i = 0; i < devcount; ++i)
@@ -556,7 +557,7 @@ BENCHMARK_DEFINE_F(FIDESlibFixture, LimbFP64Accel53bitINTT64)(benchmark::State& 
 
 	FIDESlib::CKKS::Context cc = FIDESlib::CKKS::GenCryptoContextGPU(fideslibParams, GPUs);
 
-	cudaSetDevice(GPUs[0]);
+	hipSetDevice(GPUs[0]);
 	FIDESlib::Stream s;
 	s.init();
 
@@ -578,7 +579,7 @@ BENCHMARK_DEFINE_F(FIDESlibFixture, LimbFP64Accel53bitINTT64)(benchmark::State& 
 
 BENCHMARK_DEFINE_F(FIDESlibFixture, LimbFP64Accel53bitNTT64)(benchmark::State& state) {
 	int devcount = -1;
-	cudaGetDeviceCount(&devcount);
+	hipGetDeviceCount(&devcount);
 
 	std::vector<int> GPUs;
 	for (int i = 0; i < devcount; ++i)
@@ -588,7 +589,7 @@ BENCHMARK_DEFINE_F(FIDESlibFixture, LimbFP64Accel53bitNTT64)(benchmark::State& s
 
 	FIDESlib::CKKS::Context cc = FIDESlib::CKKS::GenCryptoContextGPU(fideslibParams, GPUs);
 
-	cudaSetDevice(GPUs[0]);
+	hipSetDevice(GPUs[0]);
 	FIDESlib::Stream s;
 	s.init();
 
@@ -621,7 +622,7 @@ BENCHMARK_REGISTER_F(FIDESlibFixture, LimbFP64Accel53bitNTT64)->ArgsProduct({ { 
 
 BENCHMARK_DEFINE_F(FIDESlibFixture, LimbDeviceBatchINTT64)(benchmark::State& state) {
 	int devcount = -1;
-	cudaGetDeviceCount(&devcount);
+	hipGetDeviceCount(&devcount);
 
 	std::vector<int> GPUs;
 	for (int i = 0; i < devcount; ++i)
@@ -637,7 +638,7 @@ BENCHMARK_DEFINE_F(FIDESlibFixture, LimbDeviceBatchINTT64)(benchmark::State& sta
 
 	CudaCheckErrorMod;
 
-	cudaSetDevice(GPUs[0]);
+	hipSetDevice(GPUs[0]);
 	FIDESlib::Stream s;
 	s.init();
 
@@ -656,7 +657,7 @@ BENCHMARK_DEFINE_F(FIDESlibFixture, LimbDeviceBatchINTT64)(benchmark::State& sta
 BENCHMARK_DEFINE_F(FIDESlibFixture, LimbDeviceBatchNTT64)(benchmark::State& state) {
 	constexpr auto algo = FIDESlib::ALGO_SHOUP;
 	int devcount		= -1;
-	cudaGetDeviceCount(&devcount);
+	hipGetDeviceCount(&devcount);
 
 	std::vector<int> GPUs;
 	for (int i = 0; i < devcount; ++i)
@@ -672,7 +673,7 @@ BENCHMARK_DEFINE_F(FIDESlibFixture, LimbDeviceBatchNTT64)(benchmark::State& stat
 
 	CudaCheckErrorMod;
 
-	cudaSetDevice(GPUs[0]);
+	hipSetDevice(GPUs[0]);
 	FIDESlib::Stream s;
 	s.init();
 
@@ -691,7 +692,7 @@ BENCHMARK_DEFINE_F(FIDESlibFixture, LimbDeviceBatchNTT64)(benchmark::State& stat
 BENCHMARK_DEFINE_F(FIDESlibFixture, LimbDeviceBatchINTT32)(benchmark::State& state) {
 	constexpr auto algo = FIDESlib::ALGO_SHOUP;
 	int devcount		= -1;
-	cudaGetDeviceCount(&devcount);
+	hipGetDeviceCount(&devcount);
 
 	int n					  = state.range(1);
 	state.counters["p_limbs"] = n;
@@ -706,7 +707,7 @@ BENCHMARK_DEFINE_F(FIDESlibFixture, LimbDeviceBatchINTT32)(benchmark::State& sta
 	FIDESlib::CKKS::Context cc	   = FIDESlib::CKKS::GenCryptoContextGPU(par, GPUs);
 
 	CudaCheckErrorMod;
-	cudaSetDevice(GPUs[0]);
+	hipSetDevice(GPUs[0]);
 	FIDESlib::Stream s;
 	s.init();
 
@@ -727,7 +728,7 @@ BENCHMARK_DEFINE_F(FIDESlibFixture, LimbDeviceBatchINTT32)(benchmark::State& sta
 BENCHMARK_DEFINE_F(FIDESlibFixture, LimbDeviceBatchNTT32)(benchmark::State& state) {
 	constexpr auto algo = FIDESlib::ALGO_SHOUP;
 	int devcount		= -1;
-	cudaGetDeviceCount(&devcount);
+	hipGetDeviceCount(&devcount);
 
 	int n					  = state.range(1);
 	state.counters["p_limbs"] = n;
@@ -742,7 +743,7 @@ BENCHMARK_DEFINE_F(FIDESlibFixture, LimbDeviceBatchNTT32)(benchmark::State& stat
 	FIDESlib::CKKS::Context cc	   = FIDESlib::CKKS::GenCryptoContextGPU(par, GPUs);
 
 	CudaCheckErrorMod;
-	cudaSetDevice(GPUs[0]);
+	hipSetDevice(GPUs[0]);
 	FIDESlib::Stream s;
 	s.init();
 

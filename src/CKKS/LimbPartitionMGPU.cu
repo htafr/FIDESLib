@@ -1,3 +1,4 @@
+#include "hip/hip_runtime.h"
 //
 // Created by carlosad on 8/06/25.
 //
@@ -50,7 +51,7 @@ bool PEER_ACCESS   = envPeerAccess(false);
 
 void LimbPartition::rescaleMGPU() {
 	const int limbsize = getLimbSize(*level);
-	cudaSetDevice(device);
+	hipSetDevice(device);
 
 	Stream& stream		  = cc.top_limb_stream[id];
 	uint64_t* buffer	  = cc.top_limb_buffer[id];
@@ -117,11 +118,11 @@ void LimbPartition::rescaleMGPU() {
 					if (i == static_cast<uint32_t>(id)) {
 						// cudaSetDevice(cc.GPUid[i]);
 						stream.wait(cc.top_limb_stream[top_gpu]);
-						cudaMemcpyPeerAsync(buffer, cc.GPUid[i], cc.top_limb_buffer[top_gpu], cc.GPUid[top_gpu], cc.N * sizeof(uint64_t), stream.ptr());
+						hipMemcpyPeerAsync(buffer, cc.GPUid[i], cc.top_limb_buffer[top_gpu], cc.GPUid[top_gpu], cc.N * sizeof(uint64_t), stream.ptr());
 					}
 					CudaCheckErrorModNoSync;
 				}
-				cudaSetDevice(device);
+				hipSetDevice(device);
 			}
 		} else {
 
@@ -196,7 +197,7 @@ void LimbPartition::rescaleMGPU() {
 void LimbPartition::doubleRescaleMGPU(LimbPartition& partition) {
 	const int limbsize = getLimbSize(*level);
 	assert(limbsize == getLimbSize(*partition.level));
-	cudaSetDevice(device);
+	hipSetDevice(device);
 
 	Stream* stream[2] = { &cc.top_limb_stream[id], &cc.top_limb_stream2[id] };
 
@@ -239,7 +240,7 @@ void LimbPartition::doubleRescaleMGPU(LimbPartition& partition) {
 					STREAM(top).wait(part[i]->s);
 					SWITCH(top, INTT<ALGO_SHOUP>());
 					stream[i]->wait(STREAM(top));
-					cudaMemcpyAsync(buffer[i], std::get<U64>(top).v.data, cc.N * sizeof(uint64_t), cudaMemcpyDeviceToDevice, stream[i]->ptr());
+					hipMemcpyAsync(buffer[i], std::get<U64>(top).v.data, cc.N * sizeof(uint64_t), hipMemcpyDeviceToDevice, stream[i]->ptr());
 				}
 				/*
 			std::cout << "GPU: " << id << " ";
@@ -285,14 +286,14 @@ void LimbPartition::doubleRescaleMGPU(LimbPartition& partition) {
 
 								// stream_0.wait(cc.top_limb_stream[i]);
 								// stream_1.wait(cc.top_limb_stream2[i]);
-								cudaMemcpyPeerAsync(buffer[0], cc.GPUid[i], cc.top_limb_buffer[top_gpu], cc.GPUid[top_gpu], cc.N * sizeof(uint64_t), stream[0]->ptr());
-								cudaMemcpyPeerAsync(buffer[1], cc.GPUid[i], cc.top_limb_buffer2[top_gpu], cc.GPUid[top_gpu], cc.N * sizeof(uint64_t), stream[1]->ptr());
+								hipMemcpyPeerAsync(buffer[0], cc.GPUid[i], cc.top_limb_buffer[top_gpu], cc.GPUid[top_gpu], cc.N * sizeof(uint64_t), stream[0]->ptr());
+								hipMemcpyPeerAsync(buffer[1], cc.GPUid[i], cc.top_limb_buffer2[top_gpu], cc.GPUid[top_gpu], cc.N * sizeof(uint64_t), stream[1]->ptr());
 
 								CudaCheckErrorModNoSync;
 								stream[0]->record();
 								stream[1]->record();
 								CudaCheckErrorModNoSync;
-								cudaSetDevice(cc.GPUid[top_gpu]);
+								hipSetDevice(cc.GPUid[top_gpu]);
 								CudaCheckErrorModNoSync;
 								cc.top_limb_stream[top_gpu].wait(*stream[0]);
 								cc.top_limb_stream2[top_gpu].wait(*stream[1]);
@@ -303,7 +304,7 @@ void LimbPartition::doubleRescaleMGPU(LimbPartition& partition) {
 					CudaCheckErrorModNoSync;
 				}
 
-				cudaSetDevice(device);
+				hipSetDevice(device);
 			}
 		} else {
 #ifdef NCCL
@@ -391,7 +392,7 @@ void LimbPartition::doubleRescaleMGPU(LimbPartition& partition) {
 } // namespace FIDESlib::CKKS
 
 void LimbPartition::dotKSKfusedMGPU(LimbPartition& out2, const LimbPartition& digitSrc, const LimbPartition& ksk_a, const LimbPartition& ksk_b, const LimbPartition& src) {
-	cudaSetDevice(device);
+	hipSetDevice(device);
 
 	struct vector_gpu {
 		void*** data{ nullptr };
@@ -399,7 +400,7 @@ void LimbPartition::dotKSKfusedMGPU(LimbPartition& out2, const LimbPartition& di
 	};
 
 	vector_gpu digits{ .size = cc.dnum * 6 };
-	cudaMallocAsync(&digits.data, digits.size * sizeof(void**), s.ptr());
+	hipMallocAsync(&digits.data, digits.size * sizeof(void**), s.ptr());
 	// VectorGPU<void**> digits(s, cc.dnum * 6, device);
 	std::vector<void**> h_digits(cc.dnum * 6, nullptr);
 	LimbPartition& out1 = *this;
@@ -437,12 +438,12 @@ void LimbPartition::dotKSKfusedMGPU(LimbPartition& out2, const LimbPartition& di
 			num_limbs++;
 
 		if (num_special + num_limbs > 0) {
-			cudaMemcpyAsync(digits.data, h_digits.data(), cc.dnum * 6 * sizeof(void**), cudaMemcpyDefault, s.ptr());
+			hipMemcpyAsync(digits.data, h_digits.data(), cc.dnum * 6 * sizeof(void**), hipMemcpyDefault, s.ptr());
 			fusedDotKSK_2_<<<dim3{ (uint32_t)cc.N / 128, (uint32_t)num_special + num_limbs }, 128, 0, s.ptr()>>>(
 			  out1.limbptr.data, out1.SPECIALlimbptr.data, out2.limbptr.data, out2.SPECIALlimbptr.data, digits.data, i, id, num_special, 0);
 		}
 	}
-	cudaFreeAsync(digits.data, s.ptr());
+	hipFreeAsync(digits.data, s.ptr());
 	// digits.free(s);
 
 	src.getS().wait(s);
@@ -460,7 +461,7 @@ void LimbPartition::fusedHoistRotate(int n,
   const LimbPartition& src_c0,
   const LimbPartition& src_c1,
   bool c0_modup) {
-	cudaSetDevice(device);
+	hipSetDevice(device);
 
 	struct vector_gpu {
 		void*** data{ nullptr };
@@ -468,7 +469,7 @@ void LimbPartition::fusedHoistRotate(int n,
 	};
 
 	vector_gpu digits{ .size = n * cc.dnum * 6 + cc.dnum * 6 + 4 * n + n };
-	cudaMallocAsync(&digits.data, digits.size * sizeof(void**), s.ptr());
+	hipMallocAsync(&digits.data, digits.size * sizeof(void**), s.ptr());
 
 	// VectorGPU<void**> digits(s, n * cc.dnum * 6 + cc.dnum * 6 + 4 * n + n, device);
 	std::vector<void**> h_digits(n * cc.dnum * 6 + cc.dnum * 6 + 4 * n + n, nullptr);
@@ -551,7 +552,7 @@ void LimbPartition::fusedHoistRotate(int n,
 		while (num_limbs < (int)meta.size() && meta.at(num_limbs).id <= *level)
 			num_limbs++;
 
-		cudaMemcpyAsync(digits.data, h_digits.data(), h_digits.size() * sizeof(void**), cudaMemcpyDefault, s.ptr());
+		hipMemcpyAsync(digits.data, h_digits.data(), h_digits.size() * sizeof(void**), hipMemcpyDefault, s.ptr());
 
 		hoistedRotateDotKSK_2_<<<dim3{ (uint32_t)cc.N / 128, (uint32_t)num_special + num_limbs }, 128, sizeof(uint64_t) * 128 * i, s.ptr()>>>(digits.data + offset_c1,
 		  src_c0.limbptr.data,
@@ -578,7 +579,7 @@ void LimbPartition::fusedHoistRotate(int n,
 		c0[i]->s.wait(s);
 		c1[i]->s.wait(s);
 	}
-	cudaFreeAsync(digits.data, s.ptr());
+	hipFreeAsync(digits.data, s.ptr());
 	// digits.free(s);
 }
 
@@ -596,8 +597,8 @@ void LimbPartition::modup_ksk_moddown_mgpu(LimbPartition& c0,
   std::vector<std::atomic_uint64_t*>& thread_stop,
   const std::vector<Stream*>& external_s0) {
 	struct cached_graph {
-		cudaGraph_t first;
-		cudaGraphExec_t second;
+		hipGraph_t first;
+		hipGraphExec_t second;
 		void*** digits; //(s, cc.dnum * 5, device);
 		uint64_t buffKeyA, buffKeyB, buffAux1, buffAux2, buffC0, buffC1;
 	};
@@ -605,7 +606,7 @@ void LimbPartition::modup_ksk_moddown_mgpu(LimbPartition& c0,
 	static std::map<Parameters, std::map<std::tuple<int, bool>, cached_graph>> map_c_to_map_graph_exec[8];
 	static std::atomic_uint64_t skip;
 
-	cudaSetDevice(device);
+	hipSetDevice(device);
 
 	constexpr bool PRINT = false;
 	bool SELECT			 = id == 1;
@@ -626,14 +627,14 @@ void LimbPartition::modup_ksk_moddown_mgpu(LimbPartition& c0,
 
 	if constexpr (PRINT) {
 		if (SELECT) {
-			cudaDeviceSynchronize();
+			hipDeviceSynchronize();
 			std::cout << "GPU: " << id << "Input: ";
 			for (size_t i = 0; i < limb_size; ++i) {
 				std::cout << meta[i].id;
 				SWITCH(limb[i], printThisLimb(2));
 			}
 			std::cout << std::endl;
-			cudaDeviceSynchronize();
+			hipDeviceSynchronize();
 		}
 	}
 
@@ -654,7 +655,7 @@ void LimbPartition::modup_ksk_moddown_mgpu(LimbPartition& c0,
 	if (exec_old != map_exec.end()) {
 		digits = exec_old->second.digits;
 	} else {
-		cudaMallocAsync(&digits, 6 * cc.dnum * sizeof(void**), s.ptr());
+		hipMallocAsync(&digits, 6 * cc.dnum * sizeof(void**), s.ptr());
 		// digits = std::make_shared<VectorGPU<void**>>(s, 5 * cc.dnum, device);
 	}
 	CudaCheckErrorModNoSync;
@@ -666,7 +667,7 @@ void LimbPartition::modup_ksk_moddown_mgpu(LimbPartition& c0,
 		h_digits[j + 4 * cc.dnum] = ksk_a.limbptr.data;
 		h_digits[j + 5 * cc.dnum] = ksk_b.limbptr.data;
 	}
-	cudaMemcpyAsync(digits, h_digits.data(), digits_size * sizeof(void**), cudaMemcpyDefault, s.ptr());
+	hipMemcpyAsync(digits, h_digits.data(), digits_size * sizeof(void**), hipMemcpyDefault, s.ptr());
 
 	s.wait(auxLimbs1.s);
 	s.wait(auxLimbs2.s);
@@ -676,9 +677,9 @@ void LimbPartition::modup_ksk_moddown_mgpu(LimbPartition& c0,
 	// cudaMemcpyAsync(digits, h_digits.data(), digits_size * sizeof(void**), cudaMemcpyDefault, s.ptr());
 	//  cc.digitStream2.at(0).at(id).wait(s);  // This is for the regular limbs keySWITCH:
 
-	cudaEvent_t ev;
+	hipEvent_t ev;
 
-	cudaEventCreateWithFlags(&ev, cudaEventDisableTiming);
+	hipEventCreateWithFlags(&ev, hipEventDisableTiming);
 
 	constexpr bool SERIAL_MGPU_PRINT = false;
 	std::set<Stream*> join_at_end;
@@ -739,7 +740,7 @@ void LimbPartition::modup_ksk_moddown_mgpu(LimbPartition& c0,
 				*thread_stop[id] += 1;
 				goto skip_capture;
 			}
-			cudaStreamBeginCapture(s.ptr(), cudaStreamCaptureModeGlobal /*cudaStreamCaptureModeRelaxed*/);
+			hipStreamBeginCapture(s.ptr(), hipStreamCaptureModeGlobal /*cudaStreamCaptureModeRelaxed*/);
 		} else {
 			while (*thread_stop[id] >= *thread_stop[id - 1])
 				;
@@ -778,7 +779,7 @@ void LimbPartition::modup_ksk_moddown_mgpu(LimbPartition& c0,
 		if (GRAPH_CAPTURE) {
 			CudaCheckErrorModNoSync;
 			// cudaDeviceSynchronize();
-			cudaStreamBeginCapture(s.ptr(), cudaStreamCaptureModeThreadLocal /*cudaStreamCaptureModeRelaxed*/);
+			hipStreamBeginCapture(s.ptr(), hipStreamCaptureModeThreadLocal /*cudaStreamCaptureModeRelaxed*/);
 		}
 	}
 
@@ -874,7 +875,7 @@ void LimbPartition::modup_ksk_moddown_mgpu(LimbPartition& c0,
 
 		if constexpr (PRINT) {
 			if (SELECT) {
-				cudaDeviceSynchronize();
+				hipDeviceSynchronize();
 				std::cout << "GPU: " << id << "Out INTT: ";
 				for (size_t j = 0; j < DECOMPlimb.size(); ++j) {
 					for (size_t i = 0; i < DECOMPlimb[j].size(); ++i) {
@@ -883,7 +884,7 @@ void LimbPartition::modup_ksk_moddown_mgpu(LimbPartition& c0,
 					}
 				}
 				std::cout << std::endl;
-				cudaDeviceSynchronize();
+				hipDeviceSynchronize();
 			}
 		}
 
@@ -1132,7 +1133,7 @@ void LimbPartition::modup_ksk_moddown_mgpu(LimbPartition& c0,
 		CudaCheckErrorModNoSync;
 		if constexpr (PRINT) {
 			if (SELECT) {
-				cudaDeviceSynchronize();
+				hipDeviceSynchronize();
 				std::cout << "GPU: " << id << "Out INTT after communicate: ";
 				for (size_t j = 0; j < DECOMPlimb.size(); ++j) {
 					for (size_t i = 0; i < DECOMPlimb[j].size(); ++i) {
@@ -1141,7 +1142,7 @@ void LimbPartition::modup_ksk_moddown_mgpu(LimbPartition& c0,
 					}
 					std::cout << std::endl;
 				}
-				cudaDeviceSynchronize();
+				hipDeviceSynchronize();
 			}
 			CudaCheckErrorModNoSync;
 		}
@@ -1197,10 +1198,10 @@ void LimbPartition::modup_ksk_moddown_mgpu(LimbPartition& c0,
 				dim3 gridSize{ (uint32_t)cc.N / blockSize.x / 2 };
 				int shared_bytes = sizeof(uint64_t) * (size /*DECOMPlimb[d].size()*/) * blockSize.x * 2;
 				if (d_ > 0)
-					cudaStreamWaitEvent(stream1.ptr(), ev);
+					hipStreamWaitEvent(stream1.ptr(), ev);
 				DecompAndModUpConv_spec2<ALGO_SHOUP>
 				  <<<gridSize, blockSize, shared_bytes, stream1.ptr()>>>(DECOMPlimbptr[d_].data, *level + 1, DIGITlimbptr[d_].data, digitid[d_], getGlobals());
-				cudaEventRecord(ev, stream1.ptr());
+				hipEventRecord(ev, stream1.ptr());
 			}
 			CudaCheckErrorModNoSync;
 			cc.digitStream2.at(d_).at(id).wait(stream1); /** Get dependency for limb NTTs later */
@@ -1233,7 +1234,7 @@ void LimbPartition::modup_ksk_moddown_mgpu(LimbPartition& c0,
 
 	if constexpr (PRINT) {
 		if (SELECT) {
-			cudaDeviceSynchronize();
+			hipDeviceSynchronize();
 			std::cout << "GPU: " << id << "Out ModUp after NTT specials: ";
 			for (size_t j = 0; j < DIGITlimb.size(); ++j) {
 				for (size_t i = 0; i < DIGITlimb[j].size(); ++i) {
@@ -1243,7 +1244,7 @@ void LimbPartition::modup_ksk_moddown_mgpu(LimbPartition& c0,
 				std::cout << std::endl;
 			}
 			std::cout << std::endl;
-			cudaDeviceSynchronize();
+			hipDeviceSynchronize();
 		}
 		CudaCheckErrorModNoSync;
 	}
@@ -1271,7 +1272,7 @@ void LimbPartition::modup_ksk_moddown_mgpu(LimbPartition& c0,
 
 		if constexpr (PRINT) {
 			if (SELECT) {
-				cudaDeviceSynchronize();
+				hipDeviceSynchronize();
 				std::cout << "GPU: " << id << "Out KSK specials: ";
 				for (const auto& j : { &out1, &out2 }) {
 					for (auto& i : j->SPECIALlimb) {
@@ -1280,7 +1281,7 @@ void LimbPartition::modup_ksk_moddown_mgpu(LimbPartition& c0,
 					std::cout << std::endl;
 				}
 				std::cout << std::endl;
-				cudaDeviceSynchronize();
+				hipDeviceSynchronize();
 			}
 			CudaCheckErrorModNoSync;
 		}
@@ -1510,7 +1511,7 @@ void LimbPartition::modup_ksk_moddown_mgpu(LimbPartition& c0,
 		if (moddown) {
 			if constexpr (PRINT) {
 				if (SELECT) {
-					cudaDeviceSynchronize();
+					hipDeviceSynchronize();
 					std::cout << "GPU: " << id << "KSK specials after INTT and communicate: ";
 					for (const auto& j : { &c1, &c0 }) {
 						for (auto& i : j->SPECIALlimb) {
@@ -1519,7 +1520,7 @@ void LimbPartition::modup_ksk_moddown_mgpu(LimbPartition& c0,
 						std::cout << std::endl;
 					}
 					std::cout << std::endl;
-					cudaDeviceSynchronize();
+					hipDeviceSynchronize();
 				}
 				CudaCheckErrorModNoSync;
 			}
@@ -1556,7 +1557,7 @@ void LimbPartition::modup_ksk_moddown_mgpu(LimbPartition& c0,
 			CudaCheckErrorModNoSync;
 			if constexpr (PRINT) {
 				if (SELECT) {
-					cudaDeviceSynchronize();
+					hipDeviceSynchronize();
 					std::cout << "GPU: " << id << "Out Moddown: ";
 					for (const auto& j : { &auxLimbs1, &auxLimbs2 }) {
 						for (auto& i : j->limb) {
@@ -1565,7 +1566,7 @@ void LimbPartition::modup_ksk_moddown_mgpu(LimbPartition& c0,
 						std::cout << std::endl;
 					}
 					std::cout << std::endl;
-					cudaDeviceSynchronize();
+					hipDeviceSynchronize();
 				}
 			}
 		}
@@ -1603,7 +1604,7 @@ void LimbPartition::modup_ksk_moddown_mgpu(LimbPartition& c0,
 	CudaCheckErrorModNoSync;
 	if constexpr (PRINT) {
 		if (SELECT) {
-			cudaDeviceSynchronize();
+			hipDeviceSynchronize();
 			std::cout << "GPU: " << id << "Out ModUp after NTT all limbs: ";
 			for (size_t j = 0; j < DIGITlimb.size(); ++j) {
 				for (size_t i = 0; i < DIGITlimb[j].size(); ++i) {
@@ -1613,7 +1614,7 @@ void LimbPartition::modup_ksk_moddown_mgpu(LimbPartition& c0,
 				std::cout << std::endl;
 			}
 			std::cout << std::endl;
-			cudaDeviceSynchronize();
+			hipDeviceSynchronize();
 		}
 		CudaCheckErrorModNoSync;
 	}
@@ -1644,7 +1645,7 @@ void LimbPartition::modup_ksk_moddown_mgpu(LimbPartition& c0,
 
 		if constexpr (PRINT) {
 			if (SELECT) {
-				cudaDeviceSynchronize();
+				hipDeviceSynchronize();
 				std::cout << "GPU: " << id << "Out KSK limbs: ";
 				for (const auto& j : { &out1, &out2 }) {
 					for (auto& i : j->limb) {
@@ -1653,7 +1654,7 @@ void LimbPartition::modup_ksk_moddown_mgpu(LimbPartition& c0,
 					std::cout << std::endl;
 				}
 				std::cout << std::endl;
-				cudaDeviceSynchronize();
+				hipDeviceSynchronize();
 			}
 		}
 	}
@@ -1689,7 +1690,7 @@ void LimbPartition::modup_ksk_moddown_mgpu(LimbPartition& c0,
 		CudaCheckErrorModNoSync;
 		if constexpr (PRINT) {
 			if (SELECT) {
-				cudaDeviceSynchronize();
+				hipDeviceSynchronize();
 				std::cout << "GPU: " << id << "Out Moddown after submult: ";
 				for (const auto& j : { &c1, &c0 }) {
 					for (auto& i : j->limb) {
@@ -1698,7 +1699,7 @@ void LimbPartition::modup_ksk_moddown_mgpu(LimbPartition& c0,
 					std::cout << std::endl;
 				}
 				std::cout << std::endl;
-				cudaDeviceSynchronize();
+				hipDeviceSynchronize();
 			}
 			CudaCheckErrorModNoSync;
 		}
@@ -1751,12 +1752,12 @@ void LimbPartition::modup_ksk_moddown_mgpu(LimbPartition& c0,
 
 	if (0 && id == 0 && GRAPH_CAPTURE) {
 		// === INSPECT BEFORE ENDING ===
-		cudaStreamCaptureStatus status;
-		cudaGraph_t capturing_graph;
+		hipStreamCaptureStatus status;
+		hipGraph_t capturing_graph;
 
-		cudaStreamGetCaptureInfo(s.ptr(), &status, NULL, &capturing_graph, NULL, NULL);
+		hipStreamGetCaptureInfo(s.ptr(), &status, NULL, &capturing_graph, NULL, NULL);
 
-		if (status == cudaStreamCaptureStatusActive) {
+		if (status == hipStreamCaptureStatusActive) {
 			// printGraphDependencies(capturing_graph, "Captured Work Before EndCapture");
 			printGraphDependencies2(capturing_graph, "Captured Work Before EndCapture 2");
 		}
@@ -1769,16 +1770,16 @@ void LimbPartition::modup_ksk_moddown_mgpu(LimbPartition& c0,
 			if (exec_old != map_exec.end()) {
 				if (!MEMCPY_PEER)
 					openmp_synchronize();
-				cudaStreamEndCapture(s.ptr(), &(exec_old->second.first));
+				hipStreamEndCapture(s.ptr(), &(exec_old->second.first));
 				if (!MEMCPY_PEER)
 					openmp_synchronize();
 
 				CudaCheckErrorModNoSync;
-				cudaGraphExecUpdateResult result;
-				cudaGraphExecUpdate(exec_old->second.second, (exec_old->second.first), nullptr, &result);
+				hipGraphExecUpdateResult result;
+				hipGraphExecUpdate(exec_old->second.second, (exec_old->second.first), nullptr, &result);
 				// cudaGraphExecUpdate(graph_execs[gpu], new_graph, nullptr, &result);
 				// CudaCheckErrorModNoSync;
-				if (result != cudaGraphExecUpdateSuccess) {
+				if (result != hipGraphExecUpdateSuccess) {
 					ok = false;
 					std::cout << "Graph update failed" << std::endl;
 				}
@@ -1786,10 +1787,10 @@ void LimbPartition::modup_ksk_moddown_mgpu(LimbPartition& c0,
 			} else {
 
 				ok = false;
-				cudaGraph_t graph;
+				hipGraph_t graph;
 				if (!MEMCPY_PEER)
 					openmp_synchronize();
-				cudaStreamEndCapture(s.ptr(), &graph);
+				hipStreamEndCapture(s.ptr(), &graph);
 				CudaCheckErrorModNoSync;
 				// cudaDeviceSynchronize();
 
@@ -1813,13 +1814,13 @@ void LimbPartition::modup_ksk_moddown_mgpu(LimbPartition& c0,
 
 			if (!ok) {
 				if (exec_old != map_exec.end() && exec_old->second.second != nullptr) {
-					cudaGraphExecDestroy(exec_old->second.second);
+					hipGraphExecDestroy(exec_old->second.second);
 					// CudaCheckErrorModNoSync;
 				}
-				cudaGraphExec_t exec;
+				hipGraphExec_t exec;
 				// cudaDeviceSynchronize();
 				// CudaCheckErrorModNoSync;
-				cudaGraphInstantiateWithFlags(&exec, exec_old->second.first, cudaGraphInstantiateFlagUseNodePriority);
+				hipGraphInstantiateWithFlags(&exec, exec_old->second.first, hipGraphInstantiateFlagUseNodePriority);
 				CudaCheckErrorModNoSync;
 				if (exec_old != map_exec.end()) {
 					exec_old->second.second = exec;
@@ -1841,7 +1842,7 @@ void LimbPartition::modup_ksk_moddown_mgpu(LimbPartition& c0,
 	skip_capture:
 		if ((MEMCPY_PEER && GRAPH_CAPTURE && id == 0) || (!MEMCPY_PEER && GRAPH_CAPTURE)) {
 			CudaCheckErrorModNoSync;
-			cudaGraphLaunch(exec_old->second.second, s.ptr());
+			hipGraphLaunch(exec_old->second.second, s.ptr());
 			CudaCheckErrorModNoSync;
 
 			// cudaGraphLaunch(exec_old->second.second, s.ptr());
@@ -1866,14 +1867,14 @@ void LimbPartition::modup_ksk_moddown_mgpu(LimbPartition& c0,
 	ksk_a.getS().wait(s);
 	ksk_b.getS().wait(s);
 	// digits.free(s);
-	cudaEventDestroy(ev);
+	hipEventDestroy(ev);
 }
 
 void LimbPartition::modupMGPU(LimbPartition& aux, const std::vector<uint64_t*>& bufferGather_, std::vector<std::atomic_uint64_t*>& thread_stop, std::vector<Stream*>& external_s) {
 
 	struct cached_graph {
-		cudaGraph_t first;
-		cudaGraphExec_t second;
+		hipGraph_t first;
+		hipGraphExec_t second;
 		uint64_t buffC0, buffC1;
 	};
 
@@ -1883,10 +1884,10 @@ void LimbPartition::modupMGPU(LimbPartition& aux, const std::vector<uint64_t*>& 
 	auto& map_exec = map_c_to_map_graph_exec[id][this->cc.param];
 	auto exec_old  = map_exec.find(*level);
 
-	cudaEvent_t ev;
-	cudaEventCreateWithFlags(&ev, cudaEventDisableTiming);
+	hipEvent_t ev;
+	hipEventCreateWithFlags(&ev, hipEventDisableTiming);
 
-	cudaSetDevice(device);
+	hipSetDevice(device);
 	constexpr bool PRINT = false;
 	bool SELECT			 = id == 1;
 	LimbPartition& c1	 = *this;
@@ -1940,7 +1941,7 @@ void LimbPartition::modupMGPU(LimbPartition& aux, const std::vector<uint64_t*>& 
 				*thread_stop[id] += 1;
 				goto skip_capture;
 			}
-			cudaStreamBeginCapture(s.ptr(), cudaStreamCaptureModeGlobal /*cudaStreamCaptureModeRelaxed*/);
+			hipStreamBeginCapture(s.ptr(), hipStreamCaptureModeGlobal /*cudaStreamCaptureModeRelaxed*/);
 		} else {
 			while (*thread_stop[id] >= *thread_stop[id - 1])
 				;
@@ -1969,20 +1970,20 @@ void LimbPartition::modupMGPU(LimbPartition& aux, const std::vector<uint64_t*>& 
 		if (GRAPH_CAPTURE) {
 			CudaCheckErrorModNoSync;
 			// cudaDeviceSynchronize();
-			cudaStreamBeginCapture(s.ptr(), cudaStreamCaptureModeThreadLocal /*cudaStreamCaptureModeRelaxed*/);
+			hipStreamBeginCapture(s.ptr(), hipStreamCaptureModeThreadLocal /*cudaStreamCaptureModeRelaxed*/);
 		}
 	}
 
 	if constexpr (PRINT) {
 		if (SELECT) {
-			cudaDeviceSynchronize();
+			hipDeviceSynchronize();
 			std::cout << "GPU: " << id << "Input: ";
 			for (size_t i = 0; i < limb_size; ++i) {
 				std::cout << meta[i].id;
 				SWITCH(limb[i], printThisLimb(2));
 			}
 			std::cout << std::endl;
-			cudaDeviceSynchronize();
+			hipDeviceSynchronize();
 		}
 	}
 
@@ -2030,7 +2031,7 @@ void LimbPartition::modupMGPU(LimbPartition& aux, const std::vector<uint64_t*>& 
 		}
 		if constexpr (PRINT) {
 			if (SELECT) {
-				cudaDeviceSynchronize();
+				hipDeviceSynchronize();
 				std::cout << "GPU: " << id << "Out INTT: ";
 				for (size_t j = 0; j < DECOMPlimb.size(); ++j) {
 					for (size_t i = 0; i < DECOMPlimb[j].size(); ++i) {
@@ -2039,7 +2040,7 @@ void LimbPartition::modupMGPU(LimbPartition& aux, const std::vector<uint64_t*>& 
 					}
 				}
 				std::cout << std::endl;
-				cudaDeviceSynchronize();
+				hipDeviceSynchronize();
 			}
 		}
 		if constexpr (PRINT)
@@ -2225,7 +2226,7 @@ void LimbPartition::modupMGPU(LimbPartition& aux, const std::vector<uint64_t*>& 
 		}
 		if constexpr (PRINT) {
 			if (SELECT) {
-				cudaDeviceSynchronize();
+				hipDeviceSynchronize();
 				std::cout << "GPU: " << id << "Out INTT after communicate: ";
 				for (size_t j = 0; j < DECOMPlimb.size(); ++j) {
 					for (size_t i = 0; i < DECOMPlimb[j].size(); ++i) {
@@ -2234,7 +2235,7 @@ void LimbPartition::modupMGPU(LimbPartition& aux, const std::vector<uint64_t*>& 
 					}
 					std::cout << std::endl;
 				}
-				cudaDeviceSynchronize();
+				hipDeviceSynchronize();
 			}
 		}
 		// for (int d = 0; d < num_d; d += digits_per_it)
@@ -2278,7 +2279,7 @@ void LimbPartition::modupMGPU(LimbPartition& aux, const std::vector<uint64_t*>& 
 
 				CudaCheckErrorModNoSync;
 				if (d_ > 0)
-					cudaStreamWaitEvent(stream1.ptr(), ev);
+					hipStreamWaitEvent(stream1.ptr(), ev);
 				CudaCheckErrorModNoSync;
 				if (!PEER_ACCESS) {
 					dim3 blockSize{ 64, 2 };
@@ -2297,7 +2298,7 @@ void LimbPartition::modupMGPU(LimbPartition& aux, const std::vector<uint64_t*>& 
 					cc.digitStream2.at(d_).at(id).wait(stream1); /** Get dependency for limb NTTs later */
 				}
 				CudaCheckErrorModNoSync;
-				cudaEventRecord(ev, stream1.ptr());
+				hipEventRecord(ev, stream1.ptr());
 				CudaCheckErrorModNoSync;
 				if constexpr (PRINT)
 					std::cout << "/** NTT special limbs */" << std::endl;
@@ -2321,7 +2322,7 @@ void LimbPartition::modupMGPU(LimbPartition& aux, const std::vector<uint64_t*>& 
 		}
 		if constexpr (PRINT) {
 			if (SELECT) {
-				cudaDeviceSynchronize();
+				hipDeviceSynchronize();
 				std::cout << "GPU: " << id << "Out ModUp after NTT specials: ";
 				for (size_t j = 0; j < DIGITlimb.size(); ++j) {
 					for (size_t i = 0; i < DIGITlimb[j].size(); ++i) {
@@ -2331,7 +2332,7 @@ void LimbPartition::modupMGPU(LimbPartition& aux, const std::vector<uint64_t*>& 
 					std::cout << std::endl;
 				}
 				std::cout << std::endl;
-				cudaDeviceSynchronize();
+				hipDeviceSynchronize();
 			}
 		}
 		if constexpr (PRINT)
@@ -2400,15 +2401,15 @@ void LimbPartition::modupMGPU(LimbPartition& aux, const std::vector<uint64_t*>& 
 			if (exec_old != map_exec.end()) {
 				if (!MEMCPY_PEER)
 					openmp_synchronize();
-				cudaStreamEndCapture(s.ptr(), &(exec_old->second.first));
+				hipStreamEndCapture(s.ptr(), &(exec_old->second.first));
 				if (!MEMCPY_PEER)
 					openmp_synchronize();
 
 				CudaCheckErrorModNoSync;
-				cudaGraphExecUpdateResult result;
-				cudaGraphExecUpdate(exec_old->second.second, (exec_old->second.first), nullptr, &result);
+				hipGraphExecUpdateResult result;
+				hipGraphExecUpdate(exec_old->second.second, (exec_old->second.first), nullptr, &result);
 				// cudaGraphExecUpdate(graph_execs[gpu], new_graph, nullptr, &result);
-				if (result != cudaGraphExecUpdateSuccess) {
+				if (result != hipGraphExecUpdateSuccess) {
 					ok = false;
 					std::cout << "Graph update failed" << std::endl;
 				}
@@ -2416,10 +2417,10 @@ void LimbPartition::modupMGPU(LimbPartition& aux, const std::vector<uint64_t*>& 
 			} else {
 
 				ok = false;
-				cudaGraph_t graph;
+				hipGraph_t graph;
 				if (!MEMCPY_PEER)
 					openmp_synchronize();
-				cudaStreamEndCapture(s.ptr(), &graph);
+				hipStreamEndCapture(s.ptr(), &graph);
 				CudaCheckErrorModNoSync;
 				if (!MEMCPY_PEER)
 					openmp_synchronize();
@@ -2430,13 +2431,13 @@ void LimbPartition::modupMGPU(LimbPartition& aux, const std::vector<uint64_t*>& 
 			CudaCheckErrorModNoSync;
 			if (!ok) {
 				if (exec_old != map_exec.end() && exec_old->second.second != nullptr) {
-					cudaGraphExecDestroy(exec_old->second.second);
+					hipGraphExecDestroy(exec_old->second.second);
 					CudaCheckErrorModNoSync;
 				}
-				cudaGraphExec_t exec;
+				hipGraphExec_t exec;
 				// cudaDeviceSynchronize();
 				CudaCheckErrorModNoSync;
-				cudaGraphInstantiateWithFlags(&exec, exec_old->second.first, cudaGraphInstantiateFlagUseNodePriority);
+				hipGraphInstantiateWithFlags(&exec, exec_old->second.first, hipGraphInstantiateFlagUseNodePriority);
 				CudaCheckErrorModNoSync;
 				if (exec_old != map_exec.end()) {
 					exec_old->second.second = exec;
@@ -2449,7 +2450,7 @@ void LimbPartition::modupMGPU(LimbPartition& aux, const std::vector<uint64_t*>& 
 	skip_capture:
 		if ((MEMCPY_PEER && GRAPH_CAPTURE && id == 0) || (!MEMCPY_PEER && GRAPH_CAPTURE)) {
 			CudaCheckErrorModNoSync;
-			cudaGraphLaunch(exec_old->second.second, s.ptr());
+			hipGraphLaunch(exec_old->second.second, s.ptr());
 			CudaCheckErrorModNoSync;
 		}
 	}
@@ -2475,11 +2476,11 @@ void LimbPartition::modupMGPU(LimbPartition& aux, const std::vector<uint64_t*>& 
 	}
 	aux.s.wait(s);
 
-	cudaEventDestroy(ev);
+	hipEventDestroy(ev);
 }
 
 void LimbPartition::moddownMGPU(LimbPartition& auxLimbs, bool ntt, bool free_special_limbs, const std::vector<uint64_t*>& bufferSpecial_) {
-	cudaSetDevice(device);
+	hipSetDevice(device);
 	constexpr bool PRINT = false;
 	bool SELECT			 = id == 1;
 	LimbPartition& c1	 = *this;
@@ -2488,14 +2489,14 @@ void LimbPartition::moddownMGPU(LimbPartition& auxLimbs, bool ntt, bool free_spe
 	CudaCheckErrorModNoSync;
 	if constexpr (PRINT) {
 		if (SELECT) {
-			cudaDeviceSynchronize();
+			hipDeviceSynchronize();
 			std::cout << "GPU: " << id << "Input: ";
 			for (size_t i = 0; i < limb_size; ++i) {
 				std::cout << meta[i].id;
 				SWITCH(limb[i], printThisLimb(2));
 			}
 			std::cout << std::endl;
-			cudaDeviceSynchronize();
+			hipDeviceSynchronize();
 		}
 	}
 
@@ -2557,7 +2558,7 @@ void LimbPartition::moddownMGPU(LimbPartition& auxLimbs, bool ntt, bool free_spe
 									stream_.wait(stream);
 
 									CudaCheckErrorModNoSync;
-									cudaMemcpyPeerAsync(bufferSpecial_[j] + (cc.splitSpecialMeta.at(i).at(0).id - SPECIALmeta.at(0).id) * cc.N,
+									hipMemcpyPeerAsync(bufferSpecial_[j] + (cc.splitSpecialMeta.at(i).at(0).id - SPECIALmeta.at(0).id) * cc.N,
 									  cc.GPUid[j],
 									  ptr,
 									  cc.GPUid[i],
@@ -2629,7 +2630,7 @@ void LimbPartition::moddownMGPU(LimbPartition& auxLimbs, bool ntt, bool free_spe
 
 	if constexpr (PRINT) {
 		if (SELECT) {
-			cudaDeviceSynchronize();
+			hipDeviceSynchronize();
 			std::cout << "GPU: " << id << "KSK specials after INTT and communicate: ";
 			for (const auto& j : { &c1 }) {
 				for (auto& i : j->SPECIALlimb) {
@@ -2638,7 +2639,7 @@ void LimbPartition::moddownMGPU(LimbPartition& auxLimbs, bool ntt, bool free_spe
 				std::cout << std::endl;
 			}
 			std::cout << std::endl;
-			cudaDeviceSynchronize();
+			hipDeviceSynchronize();
 		}
 	}
 
@@ -2670,7 +2671,7 @@ void LimbPartition::moddownMGPU(LimbPartition& auxLimbs, bool ntt, bool free_spe
 
 	if constexpr (PRINT) {
 		if (SELECT) {
-			cudaDeviceSynchronize();
+			hipDeviceSynchronize();
 			std::cout << "GPU: " << id << "Out Moddown: ";
 			for (const auto& j : { &auxLimbs }) {
 				for (auto& i : j->limb) {
@@ -2679,7 +2680,7 @@ void LimbPartition::moddownMGPU(LimbPartition& auxLimbs, bool ntt, bool free_spe
 				std::cout << std::endl;
 			}
 			std::cout << std::endl;
-			cudaDeviceSynchronize();
+			hipDeviceSynchronize();
 		}
 	}
 
@@ -2716,7 +2717,7 @@ void LimbPartition::moddownMGPU(LimbPartition& auxLimbs, bool ntt, bool free_spe
 
 	if constexpr (PRINT) {
 		if (SELECT) {
-			cudaDeviceSynchronize();
+			hipDeviceSynchronize();
 			std::cout << "GPU: " << id << "Out Moddown after submult: ";
 			for (const auto& j : { &c1 }) {
 				for (auto& i : j->limb) {
@@ -2725,7 +2726,7 @@ void LimbPartition::moddownMGPU(LimbPartition& auxLimbs, bool ntt, bool free_spe
 				std::cout << std::endl;
 			}
 			std::cout << std::endl;
-			cudaDeviceSynchronize();
+			hipDeviceSynchronize();
 		}
 	}
 
@@ -2753,7 +2754,7 @@ void LimbPartition::moddownMGPU(LimbPartition& auxLimbs, bool ntt, bool free_spe
 }
 
 void LimbPartition::broadcastLimb0_mgpu() {
-	cudaSetDevice(device);
+	hipSetDevice(device);
 	static bool parity = true;
 	const int limbsize = getLimbSize(*level);
 
@@ -2766,7 +2767,7 @@ void LimbPartition::broadcastLimb0_mgpu() {
 
 	if (skip0) {
 		uint64_t* src_ptr = std::get<U64>(limb[0]).v.data;
-		cudaMemcpyAsync(buffer, src_ptr, cc.N * sizeof(uint64_t), cudaMemcpyDeviceToDevice, stream.ptr());
+		hipMemcpyAsync(buffer, src_ptr, cc.N * sizeof(uint64_t), hipMemcpyDeviceToDevice, stream.ptr());
 	}
 	/*
 #ifdef NCCL

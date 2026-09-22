@@ -1,3 +1,4 @@
+#include "hip/hip_runtime.h"
 #include "utils.cuh"
 
 namespace fs = std::filesystem;
@@ -50,22 +51,22 @@ int main(const int argc, char** argv) {
 	encryptMatrixtoGPU(tokens_path.string(), tokens_gpu, keys.publicKey, cc_, conf.numSlots, conf.blockSize, conf.rows, conf.cols, conf.level_matmul);
 
 	// --------- Timing BERT-Tiny ---------
-	cudaDeviceSynchronize();
+	hipDeviceSynchronize();
 	auto start_gpu = std::chrono::high_resolution_clock::now();
 	tokens_gpu	   = encoder(weights_layer0, precomp_gpu, Tprecomp_gpu, tokens_gpu, masks, conf, 0);
-	cudaDeviceSynchronize();
+	hipDeviceSynchronize();
 	auto end_gpu = std::chrono::high_resolution_clock::now();
 	std::cout << "Encoder 1 took: " << (std::chrono::duration_cast<std::chrono::milliseconds>(end_gpu - start_gpu).count()) << " ms." << std::endl;
 	start_gpu  = std::chrono::high_resolution_clock::now();
 	tokens_gpu = encoder(weights_layer1, precomp_gpu, Tprecomp_gpu, tokens_gpu, masks, conf, 1);
 
-	cudaDeviceSynchronize();
+	hipDeviceSynchronize();
 	end_gpu = std::chrono::high_resolution_clock::now();
 	std::cout << "Encoder 2 took: " << (std::chrono::duration_cast<std::chrono::milliseconds>(end_gpu - start_gpu).count()) << " ms." << std::endl;
 	start_gpu			= std::chrono::high_resolution_clock::now();
 	uint32_t class_pred = classifier(
 	  cc, tokens_gpu, keys.secretKey, ct_tokens, precomp_gpu, weights_layer1, masks, conf.numSlots, conf.blockSize, conf.token_length, true, output_path, TODO);
-	cudaDeviceSynchronize();
+	hipDeviceSynchronize();
 	end_gpu = std::chrono::high_resolution_clock::now();
 	std::cout << "Classifier took: " << (std::chrono::duration_cast<std::chrono::milliseconds>(end_gpu - start_gpu).count()) << " ms." << std::endl;
 	// ------------------------------------

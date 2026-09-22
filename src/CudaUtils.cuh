@@ -5,16 +5,16 @@
 #ifndef FIDESLIB_CUDAUTILS_CUH
 #define FIDESLIB_CUDAUTILS_CUH
 
-#include <cuda_runtime.h>
 #include <execinfo.h>
 #include <functional>
+#include <hip/hip_runtime.h>
 #include <map>
 #include <memory>
 #include <string>
 
 namespace FIDESlib {
 
-extern std::vector<cudaDeviceProp> GPUprop;
+extern std::vector<hipDeviceProp_t> GPUprop;
 void initGPUprop();
 int GetTargetThreads(int id);
 
@@ -24,24 +24,24 @@ void CudaNvtxStart(const std::string msg, NVTX_CATEGORIES cat = FUNCTION, int va
 void CudaNvtxStop(const std::string msg = "", NVTX_CATEGORIES cat = FUNCTION);
 
 class CudaNvtxRange {
-	const std::string msg;
-	const NVTX_CATEGORIES cat;
-	bool valid = true;
-
-  public:
-	explicit CudaNvtxRange(const std::string msg, NVTX_CATEGORIES cat = FUNCTION, int val = 0) : msg(msg), cat(cat) {
-		CudaNvtxStart(msg, cat, val);
-	}
-
-	CudaNvtxRange(CudaNvtxRange&& r) noexcept : msg(r.msg), cat(r.cat) {
-		this->valid = r.valid;
-		r.valid		= false;
-	}
-
-	~CudaNvtxRange() {
-		if (valid)
-			CudaNvtxStop(msg, cat);
-	}
+	// const std::string msg;
+	// const NVTX_CATEGORIES cat;
+	// bool valid = true;
+	//
+	//  public:
+	// explicit CudaNvtxRange(const std::string msg, NVTX_CATEGORIES cat = FUNCTION, int val = 0) : msg(msg), cat(cat) {
+	// 	CudaNvtxStart(msg, cat, val);
+	// }
+	//
+	// CudaNvtxRange(CudaNvtxRange&& r) noexcept : msg(r.msg), cat(r.cat) {
+	// 	this->valid = r.valid;
+	// 	r.valid		= false;
+	// }
+	//
+	// ~CudaNvtxRange() {
+	// 	if (valid)
+	// 		CudaNvtxStop(msg, cat);
+	// }
 };
 
 int getNumDevices();
@@ -52,47 +52,47 @@ inline void breakpoint() {
 }
 
 // TODO: Remove the cudart unloading.
-#define CudaCheckErrorMod                                                                    \
-	do {                                                                                     \
-		cudaDeviceSynchronize();                                                             \
-		cudaError_t e = cudaGetLastError();                                                  \
-		if (e == cudaErrorCudartUnloading) {                                                 \
-			exit(0);                                                                         \
-		} else if (e != cudaSuccess && e != cudaErrorPeerAccessAlreadyEnabled) {             \
-                                                                                             \
-			printf("Cuda failure %s:%d: '%s'\n", __FILE__, __LINE__, cudaGetErrorString(e)); \
-			FIDESlib::breakpoint();                                                          \
-			exit(0);                                                                         \
-		}                                                                                    \
+#define CudaCheckErrorMod                                                                   \
+	do {                                                                                    \
+		hipDeviceSynchronize();                                                             \
+		hipError_t e = hipGetLastError();                                                   \
+		if (e == hipErrorDeinitialized) {                                                   \
+			exit(0);                                                                        \
+		} else if (e != hipSuccess && e != hipErrorPeerAccessAlreadyEnabled) {              \
+                                                                                            \
+			printf("Cuda failure %s:%d: '%s'\n", __FILE__, __LINE__, hipGetErrorString(e)); \
+			FIDESlib::breakpoint();                                                         \
+			exit(0);                                                                        \
+		}                                                                                   \
 	} while (0)
 
-#define CudaCheckErrorModMGPU                                                                \
-	do {                                                                                     \
-		cudaStreamSynchronize(0);                                                            \
-		cudaError_t e = cudaGetLastError();                                                  \
-		if (e != cudaSuccess && e != cudaErrorPeerAccessAlreadyEnabled) {                    \
-			printf("Cuda failure %s:%d: '%s'\n", __FILE__, __LINE__, cudaGetErrorString(e)); \
-			FIDESlib::breakpoint();                                                          \
-			exit(0);                                                                         \
-		}                                                                                    \
+#define CudaCheckErrorModMGPU                                                               \
+	do {                                                                                    \
+		hipStreamSynchronize(0);                                                            \
+		hipError_t e = hipGetLastError();                                                   \
+		if (e != hipSuccess && e != hipErrorPeerAccessAlreadyEnabled) {                     \
+			printf("Cuda failure %s:%d: '%s'\n", __FILE__, __LINE__, hipGetErrorString(e)); \
+			FIDESlib::breakpoint();                                                         \
+			exit(0);                                                                        \
+		}                                                                                   \
 	} while (0)
 
 // TODO: FIX THE CUDARTUNLOADING ERROR, IT HAPPENS WHEN THE LIBRARY IS BEING UNLOADED, CAN BE IGNORED FOR NOW
-#define CudaCheckErrorModNoSync                                                                                          \
-	do {                                                                                                                 \
-		/*cudaDeviceSynchronize();*/                                                                                     \
-		cudaError_t e = cudaGetLastError();                                                                              \
-		if (e == cudaErrorCudartUnloading) {                                                                             \
-			exit(0);                                                                                                     \
-		} else if (e != cudaSuccess && e != cudaErrorPeerAccessAlreadyEnabled && e != cudaErrorGraphExecUpdateFailure) { \
-			void* array[10];                                                                                             \
-			size_t size;                                                                                                 \
-			size = backtrace(array, 10);                                                                                 \
-			backtrace_symbols_fd(array, size, STDERR_FILENO);                                                            \
-			printf("Cuda failure %s:%d: '%s'\n", __FILE__, __LINE__, cudaGetErrorString(e));                             \
-			FIDESlib::breakpoint();                                                                                      \
-			exit(0);                                                                                                     \
-		}                                                                                                                \
+#define CudaCheckErrorModNoSync                                                                                       \
+	do {                                                                                                              \
+		/*cudaDeviceSynchronize();*/                                                                                  \
+		hipError_t e = hipGetLastError();                                                                             \
+		if (e == hipErrorDeinitialized) {                                                                             \
+			exit(0);                                                                                                  \
+		} else if (e != hipSuccess && e != hipErrorPeerAccessAlreadyEnabled && e != hipErrorGraphExecUpdateFailure) { \
+			void* array[10];                                                                                          \
+			size_t size;                                                                                              \
+			size = backtrace(array, 10);                                                                              \
+			backtrace_symbols_fd(array, size, STDERR_FILENO);                                                         \
+			printf("Cuda failure %s:%d: '%s'\n", __FILE__, __LINE__, hipGetErrorString(e));                           \
+			FIDESlib::breakpoint();                                                                                   \
+			exit(0);                                                                                                  \
+		}                                                                                                             \
 	} while (0)
 
 #define NCCLCHECK(cmd)                                                                              \
@@ -110,16 +110,16 @@ extern std::map<void*, int> free;
 
 class Stream {
   private:
-	cudaStream_t ptr_ = nullptr;
+	hipStream_t ptr_ = nullptr;
 
   public:
-	cudaEvent_t ev = nullptr;
-	bool updated   = false;
+	hipEvent_t ev = nullptr;
+	bool updated  = false;
 	// Event ev;
 
 	void init(int priority = 0);
 
-	cudaStream_t ptr() {
+	hipStream_t ptr() {
 		updated = false;
 		return ptr_;
 	}
@@ -128,7 +128,7 @@ class Stream {
 
 	// void wait(const Event &ev) const;
 	void wait(Stream& s, bool external = false);
-	void wait(cudaStream_t s);
+	void wait(hipStream_t s);
 
 	Stream();
 
@@ -151,10 +151,10 @@ class Stream {
 	void capture_end();
 };
 
-template <bool capture> void run_in_graph(cudaGraphExec_t& exec, Stream& s, std::function<void()> run);
+template <bool capture> void run_in_graph(hipGraphExec_t& exec, Stream& s, std::function<void()> run);
 
-void* GPUmalloc(int id, int bytes, cudaStream_t stream, bool cache = false);
-void GPUfree(void* ptr, int id, int bytes, cudaStream_t stream, bool cache = false);
+void* GPUmalloc(int id, int bytes, hipStream_t stream, bool cache = false);
+void GPUfree(void* ptr, int id, int bytes, hipStream_t stream, bool cache = false);
 
 } // namespace FIDESlib
 #endif // FIDESLIB_CUDAUTILS_CUH

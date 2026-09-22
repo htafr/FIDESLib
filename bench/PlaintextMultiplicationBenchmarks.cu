@@ -26,7 +26,7 @@ BENCHMARK_DEFINE_F(GeneralFixture, MultPlaintext)(benchmark::State& state) {
 		return;
 	}
 	int devcount = -1;
-	cudaGetDeviceCount(&devcount);
+	hipGetDeviceCount(&devcount);
 
 	std::vector<int> GPUs = generalTestParams.GPUs;
 
@@ -74,7 +74,7 @@ BENCHMARK_DEFINE_F(GeneralFixture, Rescale)(benchmark::State& state) {
 		return;
 	}
 	int devcount = -1;
-	cudaGetDeviceCount(&devcount);
+	hipGetDeviceCount(&devcount);
 
 	std::vector<int> GPUs = generalTestParams.GPUs;
 
@@ -121,7 +121,7 @@ BENCHMARK_DEFINE_F(GeneralFixture, Rescale)(benchmark::State& state) {
 
 BENCHMARK_DEFINE_F(GeneralFixture, AdjustAddSub)(benchmark::State& state) {
 	int devcount = -1;
-	cudaGetDeviceCount(&devcount);
+	hipGetDeviceCount(&devcount);
 
 	std::vector<int> GPUs = generalTestParams.GPUs;
 
@@ -176,7 +176,7 @@ BENCHMARK_DEFINE_F(GeneralFixture, AdjustAddSub)(benchmark::State& state) {
 
 BENCHMARK_DEFINE_F(GeneralFixture, AdjustMult)(benchmark::State& state) {
 	int devcount = -1;
-	cudaGetDeviceCount(&devcount);
+	hipGetDeviceCount(&devcount);
 
 	std::vector<int> GPUs = generalTestParams.GPUs;
 
@@ -229,7 +229,7 @@ BENCHMARK_DEFINE_F(GeneralFixture, AdjustMult)(benchmark::State& state) {
 
 BENCHMARK_DEFINE_F(GeneralFixture, AdjustPlaintext)(benchmark::State& state) {
 	int devcount = -1;
-	cudaGetDeviceCount(&devcount);
+	hipGetDeviceCount(&devcount);
 
 	std::vector<int> GPUs = generalTestParams.GPUs;
 

@@ -1,3 +1,4 @@
+#include "hip/hip_runtime.h"
 //
 // Created by carlosad on 27/04/24.
 //
@@ -28,7 +29,7 @@ using sc = std::source_location;
 namespace FIDESlib::CKKS {
 
 LimbPartition::LimbPartition(LimbPartition&& l) noexcept
-: cc(l.cc), uid(l.uid), level(l.level), id(l.id), device((cudaSetDevice(l.device), l.device)), rank(l.rank), s(std::move(l.s)), meta(l.meta),
+: cc(l.cc), uid(l.uid), level(l.level), id(l.id), device((hipSetDevice(l.device), l.device)), rank(l.rank), s(std::move(l.s)), meta(l.meta),
   SPECIALmeta(l.SPECIALmeta), digitid(l.digitid), DECOMPmeta(l.DECOMPmeta), DIGITmeta(l.DIGITmeta), GATHERmeta(l.GATHERmeta), limb(std::move(l.limb)),
   SPECIALlimb(std::move(l.SPECIALlimb)), DECOMPlimb(std::move(l.DECOMPlimb)), DIGITlimb(std::move(l.DIGITlimb)), GATHERlimb(std::move(l.GATHERlimb)),
   bufferAUXptrs(l.bufferAUXptrs), limbptr(std::move(l.limbptr)), auxptr(std::move(l.auxptr)),
@@ -78,7 +79,7 @@ Stream initStream(bool default_) {
 }
 
 LimbPartition::LimbPartition(ContextData& cc, const uint64_t& uid, int* level, const int id, const bool def_stream)
-: cc(cc), uid(uid), level(level), id(id), device((cudaSetDevice(cc.GPUid.at(id)), cc.GPUid.at(id))), rank(cc.GPUrank.at(id)), s(initStream(def_stream)),
+: cc(cc), uid(uid), level(level), id(id), device((hipSetDevice(cc.GPUid.at(id)), cc.GPUid.at(id))), rank(cc.GPUrank.at(id)), s(initStream(def_stream)),
   meta(cc.meta.at(id)), SPECIALmeta(cc.specialMeta.at(id)), digitid(cc.GPUdigits.at(id)), DECOMPmeta(cc.decompMeta.at(id)), DIGITmeta(cc.digitMeta.at(id)),
   GATHERmeta(cc.gatherMeta), DECOMPlimb(DECOMPmeta.size()), DIGITlimb(DIGITmeta.size()), bufferAUXptrs(CudaMallocAuxBuffer(s, cc.dnum, device)),
   /*
@@ -101,7 +102,7 @@ LimbPartition::LimbPartition(ContextData& cc, const uint64_t& uid, int* level, c
 
 LimbPartition::~LimbPartition() {
 	CudaNvtxRange r(std::string{ sc::current().function_name() }.substr());
-	cudaSetDevice(device);
+	hipSetDevice(device);
 	/*
 		for (auto &i: limb) s.wait(STREAM(i));
 		for (auto &i: SPECIALlimb) s.wait(STREAM(i));
@@ -125,7 +126,7 @@ LimbPartition::~LimbPartition() {
 
 	// CudaCheckErrorMod;
 	if (bufferDECOMPandDIGIT_handle) {
-		cudaStreamSynchronize(s.ptr());
+		hipStreamSynchronize(s.ptr());
 #ifdef NCCL
 		if (bufferDECOMPandDIGIT_handle != (void*)-1)
 			NCCLCHECK(ncclCommDeregister(rank, bufferDECOMPandDIGIT_handle));
@@ -149,7 +150,7 @@ LimbPartition::~LimbPartition() {
 		GPUfree(bufferAUXptrs, id, MAXP * sizeof(void*) * (4ul + 4 * std::max(cc.dnum, 1)), s.ptr(), false);
 	// cudaFreeAsync(bufferAUXptrs, s.ptr());
 	if (bufferGATHER_handle) {
-		cudaStreamSynchronize(s.ptr());
+		hipStreamSynchronize(s.ptr());
 
 #ifdef NCCL
 		if (bufferGATHER_handle != (void*)-1)
@@ -186,7 +187,7 @@ void LimbPartition::generate(std::vector<LimbRecord>& records,
 	CudaNvtxRange r(std::string{ sc::current().function_name() }.substr());
 	constexpr bool USE_PARTITION_STREAM = true;
 	assert(pos < (int)records.size());
-	cudaSetDevice(device);
+	hipSetDevice(device);
 
 	const int limbs_size = limbs.size();
 	int size			 = std::max((int)(pos - limbs_size + 1), (int)0);
@@ -234,10 +235,10 @@ void LimbPartition::generate(std::vector<LimbRecord>& records,
 	}
 	if (size > 0) {
 		if (!noptr) {
-			cudaMemcpyAsync(ptrs.data + limbs_size, cpu_ptr.data(), size * sizeof(void*), cudaMemcpyHostToDevice, s.ptr());
+			hipMemcpyAsync(ptrs.data + limbs_size, cpu_ptr.data(), size * sizeof(void*), hipMemcpyHostToDevice, s.ptr());
 			CudaCheckErrorModNoSync;
 			if (auxptrs) {
-				cudaMemcpyAsync((*auxptrs).data + limbs_size, cpu_auxptr.data(), size * sizeof(void*), cudaMemcpyHostToDevice, s.ptr());
+				hipMemcpyAsync((*auxptrs).data + limbs_size, cpu_auxptr.data(), size * sizeof(void*), hipMemcpyHostToDevice, s.ptr());
 			}
 			CudaCheckErrorModNoSync;
 		}
@@ -253,7 +254,7 @@ void LimbPartition::generateLimb() {
 */
 
 void LimbPartition::generateLimbToLevel(int new_level) {
-	cudaSetDevice(device);
+	hipSetDevice(device);
 	int new_size = getLimbSize(new_level);
 	if (static_cast<size_t>(new_size) > limb.size()) {
 		generate(meta, limb, limbptr, new_size - 1, &auxptr);
@@ -274,7 +275,7 @@ void LimbPartition::generateAllDecompLimb(uint64_t* pInt, size_t offset) {
 */
 
 void LimbPartition::generateAllDigitLimb(uint64_t* pInt, size_t offset) {
-	cudaSetDevice(device);
+	hipSetDevice(device);
 	DIGITlimb.resize(DIGITmeta.size());
 	for (size_t i = 0; i < DIGITmeta.size(); ++i) {
 		generate(DIGITmeta[i], DIGITlimb[i], DIGITlimbptr[i], (int)DIGITmeta[i].size() - 1, nullptr /*&DIGITauxptr[i]*/, pInt, offset, nullptr, 0);
@@ -283,13 +284,13 @@ void LimbPartition::generateAllDigitLimb(uint64_t* pInt, size_t offset) {
 }
 
 void LimbPartition::generateSpecialLimb(const bool zero_out, const bool for_communication) {
-	cudaSetDevice(device);
+	hipSetDevice(device);
 	if ((for_communication && cc.GPUid.size() > 0 && bufferSPECIAL == nullptr && SPECIALmeta.size() > 0) ||
 	  (!(for_communication && cc.GPUid.size() > 0) && SPECIALlimb.size() == 0 && SPECIALmeta.size() > 0)) {
 
 		if ((for_communication && cc.GPUid.size() > 0)) {
 			assert(SPECIALlimb.size() == 0);
-			cudaMalloc(&bufferSPECIAL, std::max(1ul, cc.N * SPECIALmeta.size() * 2 * sizeof(uint64_t)));
+			hipMalloc(&bufferSPECIAL, std::max(1ul, cc.N * SPECIALmeta.size() * 2 * sizeof(uint64_t)));
 			generate(SPECIALmeta, SPECIALlimb, SPECIALlimbptr, (int)SPECIALmeta.size() - 1, &SPECIALauxptr, bufferSPECIAL, 0, bufferSPECIAL, cc.N * SPECIALmeta.size());
 		} else {
 			assert(bufferSPECIAL == nullptr);
@@ -306,13 +307,13 @@ void LimbPartition::generateSpecialLimb(const bool zero_out, const bool for_comm
 	if (zero_out) {
 		if (bufferSPECIAL) {
 			if (cc.N * SPECIALmeta.size() * sizeof(uint64_t) > 0)
-				cudaMemsetAsync(bufferSPECIAL, 0, cc.N * SPECIALmeta.size() * sizeof(uint64_t), s.ptr());
+				hipMemsetAsync(bufferSPECIAL, 0, cc.N * SPECIALmeta.size() * sizeof(uint64_t), s.ptr());
 		} else {
 			for (auto& i : SPECIALlimb) {
 				if (i.index() == U32) {
-					cudaMemsetAsync(std::get<U32>(i).v.data, 0, cc.N * sizeof(uint32_t), STREAM(i).ptr());
+					hipMemsetAsync(std::get<U32>(i).v.data, 0, cc.N * sizeof(uint32_t), STREAM(i).ptr());
 				} else {
-					cudaMemsetAsync(std::get<U64>(i).v.data, 0, cc.N * sizeof(uint64_t), STREAM(i).ptr());
+					hipMemsetAsync(std::get<U64>(i).v.data, 0, cc.N * sizeof(uint64_t), STREAM(i).ptr());
 				}
 			}
 		}
@@ -362,7 +363,7 @@ void LimbPartition::ApplyNTT(int batch,
 }
 
 template <ALGO algo, NTT_MODE mode> void LimbPartition::NTT(int batch, bool sync, NTT_fusion_fields fields) {
-	cudaSetDevice(device);
+	hipSetDevice(device);
 	int limbsize = getLimbSize(*level);
 
 	if (batch >= 1) {
@@ -417,7 +418,7 @@ void LimbPartition::ApplyINTT(int batch,
 }
 
 template <ALGO algo, INTT_MODE mode> void LimbPartition::INTT(int batch, bool sync, INTT_fusion_fields fields) {
-	cudaSetDevice(device);
+	hipSetDevice(device);
 	// TODO check level
 	const int limbsize = getLimbSize(*level);
 	if (batch >= 1) {
@@ -445,7 +446,7 @@ template <ALGO algo, INTT_MODE mode> void LimbPartition::INTT(int batch, bool sy
 #undef WWW
 
 void LimbPartition::add(const LimbPartition& p, const bool ext) {
-	cudaSetDevice(device);
+	hipSetDevice(device);
 	const int limbsize = getLimbSize(*level);
 	s.wait(p.getS());
 	for (int i = 0; i < limbsize; i += cc.batch) {
@@ -478,7 +479,7 @@ void LimbPartition::add(const LimbPartition& p, const bool ext) {
 
 void LimbPartition::scaleByP() {
 	const int limbsize = getLimbSize(*level);
-	cudaSetDevice(device);
+	hipSetDevice(device);
 	for (int i = 0; i < limbsize; i += cc.batch) {
 		STREAM(limb[i]).wait(s);
 		uint32_t num_limbs = std::min((int)limbsize - i, cc.batch);
@@ -490,7 +491,7 @@ void LimbPartition::scaleByP() {
 }
 
 void LimbPartition::sub(const LimbPartition& p) {
-	cudaSetDevice(device);
+	hipSetDevice(device);
 	const int limbsize = getLimbSize(*level);
 	s.wait(p.getS());
 	for (int i = 0; i < limbsize; i += cc.batch) {
@@ -505,7 +506,7 @@ void LimbPartition::sub(const LimbPartition& p) {
 }
 
 void LimbPartition::multElement(const LimbPartition& p) {
-	cudaSetDevice(device);
+	hipSetDevice(device);
 
 	int limbsize = getLimbSize(*level);
 	assert(limbsize <= (int)p.limb.size());
@@ -523,7 +524,7 @@ void LimbPartition::multElement(const LimbPartition& p) {
 }
 
 void LimbPartition::multElement(const LimbPartition& partition1, const LimbPartition& partition2) {
-	cudaSetDevice(device);
+	hipSetDevice(device);
 	int limbsize = getLimbSize(*level);
 	assert(limbsize <= partition1.limb.size());
 	assert(limbsize <= partition2.limb.size());
@@ -549,7 +550,7 @@ void LimbPartition::rescale() {
 	if (limbsize == 0)
 		return;
 
-	cudaSetDevice(device);
+	hipSetDevice(device);
 
 	LimbImpl& top = limb.at(limbsize - 1);
 
@@ -627,15 +628,15 @@ void LimbPartition::multPt(const LimbPartition& p) {
 	// assert(SPECIALlimb.size() == 0 && p.SPECIALlimb.size() == 0);
 	assert(limbsize <= p.limb.size());
 	assert(limbsize > 1);
-	cudaSetDevice(device);
+	hipSetDevice(device);
 
 	constexpr bool capture = false;
-	static std::map<int, cudaGraphExec_t> exec_map;
+	static std::map<int, hipGraphExec_t> exec_map;
 
 	{
 		LimbImpl& top = limb.back();
 
-		cudaGraphExec_t& exec = exec_map[limbsize];
+		hipGraphExec_t& exec = exec_map[limbsize];
 
 		run_in_graph<capture>(exec, s, [&]() {
 			STREAM(top).wait(s);
@@ -666,7 +667,7 @@ void LimbPartition::modup(LimbPartition& aux_partition) {
 	constexpr ALGO algo	 = ALGO_SHOUP;
 	constexpr bool PRINT = false;
 	// assert(SPECIALlimb.empty());
-	cudaSetDevice(device);
+	hipSetDevice(device);
 
 	const int limbsize = *level + 1;
 	generateAllDecompAndDigit(false);
@@ -726,13 +727,13 @@ void LimbPartition::modup(LimbPartition& aux_partition) {
 		}
 
 		if constexpr (PRINT) {
-			cudaDeviceSynchronize();
+			hipDeviceSynchronize();
 			std::cout << "After INTT ";
 			for (auto& i : DECOMPlimb[d]) {
 				SWITCH(i, printThisLimb(2));
 			}
 			std::cout << std::endl;
-			cudaDeviceSynchronize();
+			hipDeviceSynchronize();
 		}
 
 		{
@@ -742,13 +743,13 @@ void LimbPartition::modup(LimbPartition& aux_partition) {
 			DecompAndModUpConv<algo><<<gridSize, blockSize, shared_bytes, s_d.ptr()>>>(DECOMPlimbptr[d].data, *level + 1, DIGITlimbptr[d].data, digitid[d], getGlobals());
 		}
 		if constexpr (PRINT) {
-			cudaDeviceSynchronize();
+			hipDeviceSynchronize();
 			std::cout << "After conv ";
 			for (auto& i : DIGITlimb[d]) {
 				SWITCH(i, printThisLimb(2));
 			}
 			std::cout << std::endl;
-			cudaDeviceSynchronize();
+			hipDeviceSynchronize();
 		}
 
 		const int digitsize = cc.precom.constants[id].num_primeid_digit_to[digitid.at(d)][*level];
@@ -762,13 +763,13 @@ void LimbPartition::modup(LimbPartition& aux_partition) {
 		}
 
 		if constexpr (PRINT) {
-			cudaDeviceSynchronize();
+			hipDeviceSynchronize();
 			std::cout << "After NTT ";
 			for (auto& i : DIGITlimb[d]) {
 				SWITCH(i, printThisLimb(2));
 			}
 			std::cout << std::endl;
-			cudaDeviceSynchronize();
+			hipDeviceSynchronize();
 		}
 	}
 	for (size_t d = 0; d < DECOMPlimb.size(); ++d) {
@@ -779,7 +780,7 @@ void LimbPartition::modup(LimbPartition& aux_partition) {
 }
 
 void LimbPartition::freeSpecialLimbs() {
-	cudaSetDevice(device);
+	hipSetDevice(device);
 	for (size_t i = 0; i < SPECIALlimb.size(); ++i) {
 		STREAM(SPECIALlimb.at(i)).wait(s);
 	}
@@ -792,7 +793,7 @@ void LimbPartition::freeSpecialLimbs() {
 }
 
 void LimbPartition::copyLimb(const LimbPartition& partition) {
-	cudaSetDevice(device);
+	hipSetDevice(device);
 	s.wait(partition.getS());
 	int limbsize = getLimbSize(*level);
 	assert(*level == *partition.level);
@@ -812,7 +813,7 @@ void LimbPartition::copyLimb(const LimbPartition& partition) {
 }
 
 void LimbPartition::copySpecialLimb(const LimbPartition& p) {
-	cudaSetDevice(device);
+	hipSetDevice(device);
 	this->generateSpecialLimb(false, false);
 	s.wait(p.getS());
 	assert(*level == *p.level);
@@ -832,7 +833,7 @@ void LimbPartition::copySpecialLimb(const LimbPartition& p) {
 }
 
 void LimbPartition::generateAllDecompAndDigit(bool iskey) {
-	cudaSetDevice(device);
+	hipSetDevice(device);
 	if ((!(iskey || cc.GPUid.size() == 1) && bufferGATHER == nullptr) || ((iskey || cc.GPUid.size() == 1) && DECOMPlimb[0].size() == 0)) {
 		int decomp_limbs = 0;
 		for (auto& d : DECOMPmeta)
@@ -882,7 +883,7 @@ void LimbPartition::generateAllDecompAndDigit(bool iskey) {
 			}
 
 			if (DECOMPmeta.at(i).size() * sizeof(void*) > 0)
-				cudaMemcpyAsync(DECOMPlimbptr[i].data, cpu_ptr.data(), DECOMPmeta.at(i).size() * sizeof(void*), cudaMemcpyHostToDevice, s.ptr());
+				hipMemcpyAsync(DECOMPlimbptr[i].data, cpu_ptr.data(), DECOMPmeta.at(i).size() * sizeof(void*), hipMemcpyHostToDevice, s.ptr());
 		}
 		generateGatherLimb(iskey);
 		generateAllDigitLimb(bufferDECOMPandDIGIT, 0 /*cc.N * decomp_limbs*/);
@@ -891,7 +892,7 @@ void LimbPartition::generateAllDecompAndDigit(bool iskey) {
 
 void LimbPartition::mult1AddMult23Add4(const LimbPartition& partition1, const LimbPartition& partition2, const LimbPartition& partition3, const LimbPartition& partition4) {
 	const int limbsize = getLimbSize(*level);
-	cudaSetDevice(device);
+	hipSetDevice(device);
 	assert(limbsize <= partition1.limb.size());
 	assert(limbsize <= partition2.limb.size());
 	assert(limbsize <= partition3.limb.size());
@@ -920,7 +921,7 @@ void LimbPartition::mult1AddMult23Add4(const LimbPartition& partition1, const Li
 
 void LimbPartition::multNoModdownEnd(LimbPartition& c0, const LimbPartition& bc0, const LimbPartition& bc1, const LimbPartition& in, const LimbPartition& aux) {
 	const int limbsize = getLimbSize(*level);
-	cudaSetDevice(device);
+	hipSetDevice(device);
 	assert(limbsize <= c0.limb.size());
 	assert(limbsize <= bc0.limb.size());
 	assert(limbsize <= bc1.limb.size());
@@ -956,7 +957,7 @@ void LimbPartition::multNoModdownEnd(LimbPartition& c0, const LimbPartition& bc0
 
 void LimbPartition::mult1Add2(const LimbPartition& partition1, const LimbPartition& partition2) {
 	const int limbsize = getLimbSize(*level);
-	cudaSetDevice(device);
+	hipSetDevice(device);
 	assert(limbsize <= partition1.limb.size());
 	assert(limbsize <= partition2.limb.size());
 
@@ -978,7 +979,7 @@ void LimbPartition::mult1Add2(const LimbPartition& partition1, const LimbPartiti
 }
 
 void LimbPartition::generateLimbSingleMalloc() {
-	cudaSetDevice(device);
+	hipSetDevice(device);
 	const int limbsize = meta.size();
 
 	assert(limbsize <= meta.size());
@@ -996,7 +997,7 @@ void LimbPartition::generateLimbSingleMalloc() {
 }
 
 void LimbPartition::generateLimbConstant() {
-	cudaSetDevice(device);
+	hipSetDevice(device);
 
 	const int limbsize = getLimbSize(*level);
 	assert(limb.size() == 0);
@@ -1019,7 +1020,7 @@ void LimbPartition::generateLimbConstant() {
 }
 
 void LimbPartition::loadDecompDigit(const std::vector<std::vector<std::vector<uint64_t>>>& data, const std::vector<std::vector<uint64_t>>& moduli) {
-	cudaSetDevice(device);
+	hipSetDevice(device);
 	int limb_size = getLimbSize(*level);
 
 	if (cc.GPUid.size() == 1) {
@@ -1049,7 +1050,7 @@ void LimbPartition::loadDecompDigit(const std::vector<std::vector<std::vector<ui
 				}
 			}
 		}
-		cudaMemcpyAsync(limbptr.data, cpu_ptr.data(), cpu_ptr.size() * sizeof(void*), cudaMemcpyHostToDevice, s.ptr());
+		hipMemcpyAsync(limbptr.data, cpu_ptr.data(), cpu_ptr.size() * sizeof(void*), hipMemcpyHostToDevice, s.ptr());
 	} else {
 		for (size_t i = 0; i < DECOMPmeta.size(); ++i) {
 			for (int32_t j = 0; j < limb_size; ++j) {
@@ -1082,7 +1083,7 @@ void LimbPartition::loadDecompDigit(const std::vector<std::vector<std::vector<ui
 /** TODO: deprecate towards fused version */
 
 void LimbPartition::dotKSK(const LimbPartition& src, const LimbPartition& ksk, const bool inplace, const LimbPartition* limbsrc) {
-	cudaSetDevice(device);
+	hipSetDevice(device);
 	constexpr bool PRINT = false;
 	s.wait(src.getS());
 	s.wait(ksk.getS());
@@ -1301,7 +1302,7 @@ void LimbPartition::multModupDotKSK(LimbPartition& c1, const LimbPartition& c1ti
 	constexpr bool PRINT   = false;
 	assert(c0.SPECIALlimb.size() == SPECIALmeta.size());
 	assert(c1.SPECIALlimb.size() == SPECIALmeta.size());
-	cudaSetDevice(device);
+	hipSetDevice(device);
 
 	// std::map<int, int> used;
 	s.wait(c0.getS());
@@ -1505,7 +1506,7 @@ void LimbPartition::rotateModupDotKSK(LimbPartition& c1, LimbPartition& c0, cons
 	constexpr bool PRINT   = false;
 	assert(c0.SPECIALlimb.size() == SPECIALmeta.size());
 	assert(c1.SPECIALlimb.size() == SPECIALmeta.size());
-	cudaSetDevice(device);
+	hipSetDevice(device);
 
 	// std::map<int, int> used;
 	s.wait(c0.getS());
@@ -1695,7 +1696,7 @@ void LimbPartition::squareModupDotKSK(LimbPartition& c1, LimbPartition& c0, cons
 	constexpr bool PRINT   = false;
 	assert(c0.SPECIALlimb.size() == SPECIALmeta.size());
 	assert(c1.SPECIALlimb.size() == SPECIALmeta.size());
-	cudaSetDevice(device);
+	hipSetDevice(device);
 
 	// std::map<int, int> used;
 	s.wait(c0.getS());
@@ -1881,7 +1882,7 @@ void LimbPartition::squareModupDotKSK(LimbPartition& c1, LimbPartition& c0, cons
 template <ALGO algo> void LimbPartition::moddown(LimbPartition& auxLimbs, bool ntt, bool free_special_limbs) {
 	assert(SPECIALlimb.size() == SPECIALmeta.size());
 	const int limbsize = *level + 1;
-	cudaSetDevice(device);
+	hipSetDevice(device);
 	constexpr bool PRINT = false;
 
 	s.wait(auxLimbs.getS());
@@ -1958,7 +1959,7 @@ template <ALGO algo> void LimbPartition::moddown(LimbPartition& auxLimbs, bool n
 #undef YY
 
 void LimbPartition::automorph(const int index, const int br, LimbPartition* src, const bool ext) {
-	cudaSetDevice(device);
+	hipSetDevice(device);
 	int limbsize = getLimbSize(*level);
 	assert(src && "Don't use the inplace version of automorph");
 	if (src)
@@ -2020,7 +2021,7 @@ void LimbPartition::modupInto(LimbPartition& partition, LimbPartition& aux_parti
 	constexpr ALGO algo	 = ALGO_SHOUP;
 	constexpr bool PRINT = false;
 	// assert(SPECIALlimb.empty());
-	cudaSetDevice(device);
+	hipSetDevice(device);
 
 	const int limbsize = *level + 1;
 
@@ -2103,7 +2104,7 @@ void LimbPartition::modupInto(LimbPartition& partition, LimbPartition& aux_parti
 }
 
 void LimbPartition::multScalar(std::vector<uint64_t>& vector) {
-	cudaSetDevice(device);
+	hipSetDevice(device);
 	/*
 	cudaDeviceSynchronize();
 	for (auto& l : limb) {
@@ -2120,9 +2121,9 @@ void LimbPartition::multScalar(std::vector<uint64_t>& vector) {
 	const int limbsize = getLimbSize(*level);
 
 	uint64_t* elems;
-	cudaMallocAsync(&elems, vector.size() * sizeof(uint64_t), s.ptr());
+	hipMallocAsync(&elems, vector.size() * sizeof(uint64_t), s.ptr());
 	// cudaMalloc(&elems, vector.size() * sizeof(uint64_t));
-	cudaMemcpyAsync(elems, vector.data(), vector.size() * sizeof(uint64_t), cudaMemcpyDefault, s.ptr());
+	hipMemcpyAsync(elems, vector.data(), vector.size() * sizeof(uint64_t), hipMemcpyDefault, s.ptr());
 
 	for (int i = 0; i < limbsize; i += cc.batch) {
 		STREAM(limb[i]).wait(s);
@@ -2132,16 +2133,16 @@ void LimbPartition::multScalar(std::vector<uint64_t>& vector) {
 	for (int i = 0; i < limbsize; i += cc.batch) {
 		s.wait(STREAM(limb[i]));
 	}
-	cudaFreeAsync(elems, s.ptr());
+	hipFreeAsync(elems, s.ptr());
 }
 
 void LimbPartition::addScalar(std::vector<uint64_t>& vector) {
 	const int limbsize = getLimbSize(*level);
-	cudaSetDevice(device);
+	hipSetDevice(device);
 	uint64_t* elems;
-	cudaMallocAsync(&elems, vector.size() * sizeof(uint64_t), s.ptr());
+	hipMallocAsync(&elems, vector.size() * sizeof(uint64_t), s.ptr());
 	// cudaMalloc(&elems, vector.size() * sizeof(uint64_t));
-	cudaMemcpyAsync(elems, vector.data(), vector.size() * sizeof(uint64_t), cudaMemcpyDefault, s.ptr());
+	hipMemcpyAsync(elems, vector.data(), vector.size() * sizeof(uint64_t), hipMemcpyDefault, s.ptr());
 	for (int i = 0; i < limbsize; i += cc.batch) {
 		STREAM(limb[i]).wait(s);
 		uint32_t num_limbs = std::min((int)limbsize - i, cc.batch);
@@ -2151,16 +2152,16 @@ void LimbPartition::addScalar(std::vector<uint64_t>& vector) {
 	for (int i = 0; i < limbsize; i += cc.batch) {
 		s.wait(STREAM(limb[i]));
 	}
-	cudaFreeAsync(elems, s.ptr());
+	hipFreeAsync(elems, s.ptr());
 }
 
 void LimbPartition::subScalar(std::vector<uint64_t>& vector) {
 	const int limbsize = getLimbSize(*level);
-	cudaSetDevice(device);
+	hipSetDevice(device);
 	uint64_t* elems;
-	cudaMallocAsync(&elems, vector.size() * sizeof(uint64_t), s.ptr());
+	hipMallocAsync(&elems, vector.size() * sizeof(uint64_t), s.ptr());
 	// cudaMalloc(&elems, vector.size() * sizeof(uint64_t));
-	cudaMemcpyAsync(elems, vector.data(), vector.size() * sizeof(uint64_t), cudaMemcpyDefault, s.ptr());
+	hipMemcpyAsync(elems, vector.data(), vector.size() * sizeof(uint64_t), hipMemcpyDefault, s.ptr());
 	for (int i = 0; i < limbsize; i += cc.batch) {
 		STREAM(limb[i]).wait(s);
 		uint32_t num_limbs = std::min((int)limbsize - i, cc.batch);
@@ -2169,11 +2170,11 @@ void LimbPartition::subScalar(std::vector<uint64_t>& vector) {
 	for (int i = 0; i < limbsize; i += cc.batch) {
 		s.wait(STREAM(limb[i]));
 	}
-	cudaFreeAsync(elems, s.ptr());
+	hipFreeAsync(elems, s.ptr());
 }
 
 void LimbPartition::add(const LimbPartition& a, const LimbPartition& b, const bool ext_a, const bool ext_b) {
-	cudaSetDevice(device);
+	hipSetDevice(device);
 	s.wait(a.getS());
 	s.wait(b.getS());
 
@@ -2229,7 +2230,7 @@ void LimbPartition::add(const LimbPartition& a, const LimbPartition& b, const bo
 
 void LimbPartition::squareElement(const LimbPartition& p) {
 	const int limbsize = getLimbSize(*level);
-	cudaSetDevice(device);
+	hipSetDevice(device);
 	s.wait(p.getS());
 	int size = std::min(limbsize, (int)p.limb.size());
 	for (int i = 0; i < size; i += cc.batch) {
@@ -2245,7 +2246,7 @@ void LimbPartition::squareElement(const LimbPartition& p) {
 
 void LimbPartition::binomialSquareFold(LimbPartition& c0_res, const LimbPartition& c2_key_switched_0, const LimbPartition& c2_key_switched_1) {
 	const int limbsize = getLimbSize(*level);
-	cudaSetDevice(device);
+	hipSetDevice(device);
 	s.wait(c0_res.getS());
 	s.wait(c2_key_switched_0.getS());
 	s.wait(c2_key_switched_1.getS());
@@ -2264,7 +2265,7 @@ void LimbPartition::binomialSquareFold(LimbPartition& c0_res, const LimbPartitio
 }
 
 void LimbPartition::dropLimb() {
-	cudaSetDevice(device);
+	hipSetDevice(device);
 
 	STREAM(limb.back()).wait(s);
 	limb.pop_back();
@@ -2274,7 +2275,7 @@ void LimbPartition::addMult(const LimbPartition& a, const LimbPartition& b) {
 	const int limbsize = getLimbSize(*level);
 	assert(a.limb.size() >= limbsize);
 	assert(b.limb.size() >= limbsize);
-	cudaSetDevice(device);
+	hipSetDevice(device);
 	s.wait(a.getS());
 	s.wait(b.getS());
 	for (int i = 0; i < limbsize; i += cc.batch) {
@@ -2291,36 +2292,36 @@ void LimbPartition::addMult(const LimbPartition& a, const LimbPartition& b) {
 
 void LimbPartition::broadcastLimb0() {
 	const int limbsize = getLimbSize(*level);
-	cudaSetDevice(device);
+	hipSetDevice(device);
 	assert(limbsize - 1 > 0);
 	broadcastLimb0_<<<dim3{ (uint32_t)cc.N / 128, (uint32_t)limbsize - 1 }, 128, 0, s.ptr()>>>(limbptr.data);
 }
 
 void LimbPartition::evalLinearWSum(uint32_t n, std::vector<const LimbPartition*> ps, std::vector<uint64_t>& weights) {
 	const int limbsize = getLimbSize(*level);
-	cudaSetDevice(device);
+	hipSetDevice(device);
 	for (uint32_t i = 0; i < n; ++i) {
 		s.wait(ps[i]->getS());
 	}
 
 	uint64_t* elems;
-	cudaMallocAsync(&elems, weights.size() * sizeof(uint64_t), s.ptr());
+	hipMallocAsync(&elems, weights.size() * sizeof(uint64_t), s.ptr());
 	// cudaMalloc(&elems, weights.size() * sizeof(uint64_t));
-	cudaMemcpyAsync(elems, weights.data(), weights.size() * sizeof(uint64_t), cudaMemcpyDefault, s.ptr());
+	hipMemcpyAsync(elems, weights.data(), weights.size() * sizeof(uint64_t), hipMemcpyDefault, s.ptr());
 	std::vector<void**> psptr(n, nullptr);
 	for (uint32_t i = 0; i < n; ++i) {
 		psptr[i] = ps[i]->limbptr.data;
 		assert(ps[i]->limb.size() >= limbsize);
 	}
 	void*** d_psptr;
-	cudaMallocAsync(&d_psptr, psptr.size() * sizeof(void**), s.ptr());
+	hipMallocAsync(&d_psptr, psptr.size() * sizeof(void**), s.ptr());
 	// cudaMalloc(&d_psptr, psptr.size() * sizeof(void**));
-	cudaMemcpyAsync(d_psptr, psptr.data(), psptr.size() * sizeof(void**), cudaMemcpyDefault, s.ptr());
+	hipMemcpyAsync(d_psptr, psptr.data(), psptr.size() * sizeof(void**), hipMemcpyDefault, s.ptr());
 
 	if (!limb.empty() && limbsize > 0)
 		eval_linear_w_sum_<<<dim3{ (uint32_t)cc.N / 128, (uint32_t)limbsize }, 128, 0, s.ptr()>>>(n, limbptr.data, d_psptr, elems, PARTITION(id, 0));
-	cudaFreeAsync(elems, s.ptr());
-	cudaFreeAsync(d_psptr, s.ptr());
+	hipFreeAsync(elems, s.ptr());
+	hipFreeAsync(d_psptr, s.ptr());
 	for (uint32_t i = 0; i < n; ++i) {
 		ps[i]->getS().wait(s);
 	}
@@ -2330,7 +2331,7 @@ void LimbPartition::evalLinearWSum(uint32_t n, std::vector<const LimbPartition*>
   Only for MGPU key generation and extended limb partitions
  */
 void LimbPartition::generatePartialSpecialLimb() {
-	cudaSetDevice(device);
+	hipSetDevice(device);
 	if (SPECIALlimb.size() == 0 && cc.splitSpecialMeta.at(id).size() > 0 /*&& bufferSPECIAL == nullptr*/) {
 		// if (bufferSPECIAL)
 		//     GPUfree(bufferSPECIAL, id, std::max(1ul, cc.N * cc.splitSpecialMeta.at(id).size() * sizeof(uint64_t)),
@@ -2355,7 +2356,7 @@ void LimbPartition::dotProductPt(LimbPartition& c1,
   const bool ext) {
 
 	const int limbsize = getLimbSize(*level);
-	cudaSetDevice(device);
+	hipSetDevice(device);
 	uint32_t n = c0s.size();
 	std::vector<void**> h_data(n * 3 * (1 + ext), nullptr);
 
@@ -2427,7 +2428,7 @@ void LimbPartition::binomialDotProduct(LimbPartition& c1,
   const std::vector<const LimbPartition*>& d1s,
   const bool ext) {
 	const int limbsize = getLimbSize(*level);
-	cudaSetDevice(device);
+	hipSetDevice(device);
 	uint32_t n = c0s.size();
 	std::vector<void**> h_data((n * 4 + 3) * (1 + ext), nullptr);
 
@@ -2541,7 +2542,7 @@ void LimbPartition::binomialDotProduct(LimbPartition& c1,
 
 void LimbPartition::binomialMult(LimbPartition& c1, LimbPartition& c2, const LimbPartition& d0, const LimbPartition& d1, bool extend_ins, bool square) {
 	const int limbsize = getLimbSize(*level);
-	cudaSetDevice(device);
+	hipSetDevice(device);
 
 	s.wait(c1.getS());
 	s.wait(c2.getS());
@@ -2610,17 +2611,17 @@ void LimbPartition::generateGatherLimb(bool iskey) {
 				}
 
 				if (GATHERptr.size * sizeof(void*) > 0) {
-					cudaMemcpyAsync(GATHERptr.data, h_gatherptr.data(), GATHERptr.size * sizeof(void*), cudaMemcpyHostToDevice, s.ptr());
+					hipMemcpyAsync(GATHERptr.data, h_gatherptr.data(), GATHERptr.size * sizeof(void*), hipMemcpyHostToDevice, s.ptr());
 				}
 			}
 		} else {
 #ifdef NCCL
-			cudaStreamSynchronize(s.ptr());
+			hipStreamSynchronize(s.ptr());
 			NCCLCHECK(ncclMemAlloc((void**)&bufferGATHER, std::max(1ul, GATHERmeta.size() * sizeof(uint64_t) * cc.N)));
 			NCCLCHECK(ncclCommRegister(rank, bufferGATHER, std::max(1ul, GATHERmeta.size() * sizeof(uint64_t) * cc.N), &bufferGATHER_handle));
 			if (bufferGATHER_handle == nullptr)
 				bufferGATHER_handle = (void*)-1;
-			cudaDeviceSynchronize();
+			hipDeviceSynchronize();
 #else
 			assert(false);
 #endif
@@ -2630,7 +2631,7 @@ void LimbPartition::generateGatherLimb(bool iskey) {
 				h_gatherptr[i] = (void*)(bufferGATHER + cc.N * i);
 
 			if (GATHERptr.size * sizeof(void*) > 0) {
-				cudaMemcpyAsync(GATHERptr.data, h_gatherptr.data(), GATHERptr.size * sizeof(void*), cudaMemcpyHostToDevice, s.ptr());
+				hipMemcpyAsync(GATHERptr.data, h_gatherptr.data(), GATHERptr.size * sizeof(void*), hipMemcpyHostToDevice, s.ptr());
 			}
 		}
 	}

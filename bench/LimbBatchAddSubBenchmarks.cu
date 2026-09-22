@@ -9,7 +9,7 @@
 namespace FIDESlib::Benchmarks {
 BENCHMARK_DEFINE_F(FIDESlibFixture, LimbBatchAdd)(benchmark::State& state) {
 	int devcount = -1;
-	cudaGetDeviceCount(&devcount);
+	hipGetDeviceCount(&devcount);
 
 	std::vector<int> GPUs;
 	for (int i = 0; i < devcount; ++i)
@@ -21,7 +21,7 @@ BENCHMARK_DEFINE_F(FIDESlibFixture, LimbBatchAdd)(benchmark::State& state) {
 	int n					  = state.range(1);
 	state.counters["p_limbs"] = n;
 
-	cudaSetDevice(GPUs[0]);
+	hipSetDevice(GPUs[0]);
 	FIDESlib::Stream s;
 	s.init();
 
@@ -54,7 +54,7 @@ BENCHMARK_DEFINE_F(FIDESlibFixture, LimbBatchAdd)(benchmark::State& state) {
 
 BENCHMARK_DEFINE_F(FIDESlibFixture, LimbBatchAdd64)(benchmark::State& state) {
 	int devcount = -1;
-	cudaGetDeviceCount(&devcount);
+	hipGetDeviceCount(&devcount);
 
 	std::vector<int> GPUs;
 	for (int i = 0; i < devcount; ++i)
@@ -66,7 +66,7 @@ BENCHMARK_DEFINE_F(FIDESlibFixture, LimbBatchAdd64)(benchmark::State& state) {
 	int n					  = state.range(1);
 	state.counters["p_limbs"] = n;
 
-	cudaSetDevice(GPUs[0]);
+	hipSetDevice(GPUs[0]);
 	FIDESlib::Stream s;
 	s.init();
 
@@ -100,7 +100,7 @@ BENCHMARK_DEFINE_F(FIDESlibFixture, LimbBatchAdd64)(benchmark::State& state) {
 
 BENCHMARK_DEFINE_F(FIDESlibFixture, LimbBatchSub)(benchmark::State& state) {
 	int devcount = -1;
-	cudaGetDeviceCount(&devcount);
+	hipGetDeviceCount(&devcount);
 
 	std::vector<int> GPUs;
 	for (int i = 0; i < devcount; ++i)
@@ -112,7 +112,7 @@ BENCHMARK_DEFINE_F(FIDESlibFixture, LimbBatchSub)(benchmark::State& state) {
 	int n					  = state.range(1);
 	state.counters["p_limbs"] = n;
 
-	cudaSetDevice(GPUs[0]);
+	hipSetDevice(GPUs[0]);
 	FIDESlib::Stream s;
 	s.init();
 
@@ -146,7 +146,7 @@ BENCHMARK_DEFINE_F(FIDESlibFixture, LimbBatchSub)(benchmark::State& state) {
 
 BENCHMARK_DEFINE_F(FIDESlibFixture, LimbBatchSub64)(benchmark::State& state) {
 	int devcount = -1;
-	cudaGetDeviceCount(&devcount);
+	hipGetDeviceCount(&devcount);
 
 	std::vector<int> GPUs;
 	for (int i = 0; i < devcount; ++i)
@@ -157,7 +157,7 @@ BENCHMARK_DEFINE_F(FIDESlibFixture, LimbBatchSub64)(benchmark::State& state) {
 	int n					  = state.range(1);
 	state.counters["p_limbs"] = n;
 
-	cudaSetDevice(GPUs[0]);
+	hipSetDevice(GPUs[0]);
 	FIDESlib::Stream s;
 	s.init();
 

@@ -21,9 +21,9 @@
 // Simple CUDA error check macro
 #define CUDA_CHECK(stmt)                                                                                                  \
 	do {                                                                                                                  \
-		cudaError_t err = (stmt);                                                                                         \
-		if (err != cudaSuccess) {                                                                                         \
-			std::cerr << "CUDA error: " << cudaGetErrorString(err) << " at " << __FILE__ << ":" << __LINE__ << std::endl; \
+		hipError_t err = (stmt);                                                                                         \
+		if (err != hipSuccess) {                                                                                         \
+			std::cerr << "CUDA error: " << hipGetErrorString(err) << " at " << __FILE__ << ":" << __LINE__ << std::endl; \
 			FIDESlib::breakpoint();                                                                                       \
 		}                                                                                                                 \
 	} while (0)
@@ -50,27 +50,27 @@ static void expect_equal(const std::vector<float>& a, const std::vector<float>& 
  */
 static void safe_enable_p2p(int src_gpu, int dst_gpu) {
 	int can_access = 0;
-	CUDA_CHECK(cudaDeviceCanAccessPeer(&can_access, src_gpu, dst_gpu));
+	CUDA_CHECK(hipDeviceCanAccessPeer(&can_access, src_gpu, dst_gpu));
 
 	if (!can_access) {
 		std::cout << "  P2P not available: GPU " << src_gpu << " -> GPU " << dst_gpu << std::endl;
 		return;
 	}
 
-	CUDA_CHECK(cudaSetDevice(src_gpu));
+	CUDA_CHECK(hipSetDevice(src_gpu));
 
 	// Try to enable P2P; if already enabled, cudaDeviceEnablePeerAccess
 	// returns cudaErrorPeerAccessAlreadyEnabled, which we ignore
-	cudaError_t err = cudaDeviceEnablePeerAccess(dst_gpu, 0);
+	hipError_t err = hipDeviceEnablePeerAccess(dst_gpu, 0);
 
-	if (err == cudaErrorPeerAccessAlreadyEnabled) {
+	if (err == hipErrorPeerAccessAlreadyEnabled) {
 		std::cout << "  P2P already enabled: GPU " << src_gpu << " -> GPU " << dst_gpu << std::endl;
 		return;
-	} else if (err == cudaSuccess) {
+	} else if (err == hipSuccess) {
 		std::cout << "  P2P enabled: GPU " << src_gpu << " -> GPU " << dst_gpu << std::endl;
 		return;
 	} else {
-		std::cerr << "  Failed to enable P2P: GPU " << src_gpu << " -> GPU " << dst_gpu << ": " << cudaGetErrorString(err) << std::endl;
+		std::cerr << "  Failed to enable P2P: GPU " << src_gpu << " -> GPU " << dst_gpu << ": " << hipGetErrorString(err) << std::endl;
 		return;
 	}
 }
@@ -79,123 +79,123 @@ static void safe_enable_p2p(int src_gpu, int dst_gpu) {
  * Disable P2P access safely: handle case where not enabled
  */
 [[maybe_unused]] static void safe_disable_p2p(int src_gpu, int dst_gpu) {
-	CUDA_CHECK(cudaSetDevice(src_gpu));
-	cudaError_t err = cudaDeviceDisablePeerAccess(dst_gpu);
+	CUDA_CHECK(hipSetDevice(src_gpu));
+	hipError_t err = hipDeviceDisablePeerAccess(dst_gpu);
 
-	if (err == cudaErrorPeerAccessNotEnabled) {
+	if (err == hipErrorPeerAccessNotEnabled) {
 		// Already disabled, that's fine
 		return;
-	} else if (err == cudaSuccess) {
+	} else if (err == hipSuccess) {
 		std::cout << "  P2P disabled: GPU " << src_gpu << " -> GPU " << dst_gpu << std::endl;
 	} else {
-		std::cerr << "  Warning: Failed to disable P2P: GPU " << src_gpu << " -> GPU " << dst_gpu << ": " << cudaGetErrorString(err) << std::endl;
+		std::cerr << "  Warning: Failed to disable P2P: GPU " << src_gpu << " -> GPU " << dst_gpu << ": " << hipGetErrorString(err) << std::endl;
 	}
 }
 
 // Common test body: assumes src/dst are on devDst and devSrc chosen appropriately
 static void run_p2p_test(int devSrc, int devDst, size_t n) {
-	CUDA_CHECK(cudaSetDevice(devSrc));
+	CUDA_CHECK(hipSetDevice(devSrc));
 	float* d_src = nullptr;
-	CUDA_CHECK(cudaMalloc(&d_src, n * sizeof(float)));
+	CUDA_CHECK(hipMalloc(&d_src, n * sizeof(float)));
 
-	CUDA_CHECK(cudaSetDevice(devDst));
+	CUDA_CHECK(hipSetDevice(devDst));
 	float* d_dst = nullptr;
-	CUDA_CHECK(cudaMalloc(&d_dst, n * sizeof(float)));
+	CUDA_CHECK(hipMalloc(&d_dst, n * sizeof(float)));
 
 	uint32_t* d_flag = nullptr;
-	CUDA_CHECK(cudaMalloc(&d_flag, sizeof(uint32_t)));
-	CUDA_CHECK(cudaMemset(d_flag, 0, sizeof(uint32_t)));
+	CUDA_CHECK(hipMalloc(&d_flag, sizeof(uint32_t)));
+	CUDA_CHECK(hipMemset(d_flag, 0, sizeof(uint32_t)));
 
 	// Initialize host data and copy to src device
 	std::vector<float> h_src(n), h_dst(n);
 	init_host_data(h_src, 1.0f);
 
-	CUDA_CHECK(cudaSetDevice(devSrc));
-	CUDA_CHECK(cudaMemcpy(d_src, h_src.data(), n * sizeof(float), cudaMemcpyHostToDevice));
+	CUDA_CHECK(hipSetDevice(devSrc));
+	CUDA_CHECK(hipMemcpy(d_src, h_src.data(), n * sizeof(float), hipMemcpyHostToDevice));
 
 	// Launch transfer and notify kernels on src device
-	CUDA_CHECK(cudaSetDevice(devSrc));
-	cudaStream_t sSrc;
-	CUDA_CHECK(cudaStreamCreate(&sSrc));
+	CUDA_CHECK(hipSetDevice(devSrc));
+	hipStream_t sSrc;
+	CUDA_CHECK(hipStreamCreate(&sSrc));
 
 	int threads = 256;
 	int blocks	= static_cast<int>((n + threads - 1) / threads);
 
 	FIDESlib::p2p_transfer_1d<<<blocks, threads, 0, sSrc>>>(d_src, d_dst, n);
-	CUDA_CHECK(cudaGetLastError());
+	CUDA_CHECK(hipGetLastError());
 
 	uint32_t expectedValue = 1;
 	FIDESlib::notify_kernel<<<1, 32, 0, sSrc>>>(d_flag, expectedValue);
-	CUDA_CHECK(cudaGetLastError());
+	CUDA_CHECK(hipGetLastError());
 
 	// On destination device, wait for flag and then read back
-	CUDA_CHECK(cudaSetDevice(devDst));
-	cudaStream_t sDst;
-	CUDA_CHECK(cudaStreamCreate(&sDst));
+	CUDA_CHECK(hipSetDevice(devDst));
+	hipStream_t sDst;
+	CUDA_CHECK(hipStreamCreate(&sDst));
 
 	FIDESlib::p2p_polling_kernel<<<1, 256, 0, sDst>>>(d_flag, expectedValue);
-	CUDA_CHECK(cudaGetLastError());
+	CUDA_CHECK(hipGetLastError());
 
 	// Wait for destination stream to finish (i.e., transfer+notify complete)
-	CUDA_CHECK(cudaStreamSynchronize(sDst));
+	CUDA_CHECK(hipStreamSynchronize(sDst));
 
 	// Copy dst back to host from destination device
-	CUDA_CHECK(cudaMemcpy(h_dst.data(), d_dst, n * sizeof(float), cudaMemcpyDeviceToHost));
+	CUDA_CHECK(hipMemcpy(h_dst.data(), d_dst, n * sizeof(float), hipMemcpyDeviceToHost));
 
 	// Verify correctness
 	expect_equal(h_src, h_dst);
 
 	// Cleanup
-	CUDA_CHECK(cudaStreamDestroy(sSrc));
-	CUDA_CHECK(cudaStreamDestroy(sDst));
+	CUDA_CHECK(hipStreamDestroy(sSrc));
+	CUDA_CHECK(hipStreamDestroy(sDst));
 
-	CUDA_CHECK(cudaSetDevice(devSrc));
-	CUDA_CHECK(cudaFree(d_src));
+	CUDA_CHECK(hipSetDevice(devSrc));
+	CUDA_CHECK(hipFree(d_src));
 
-	CUDA_CHECK(cudaSetDevice(devDst));
-	CUDA_CHECK(cudaFree(d_dst));
-	CUDA_CHECK(cudaFree(d_flag));
+	CUDA_CHECK(hipSetDevice(devDst));
+	CUDA_CHECK(hipFree(d_dst));
+	CUDA_CHECK(hipFree(d_flag));
 }
 
 static void run_p2p_test_graph(int devSrc, int devDst, size_t n) {
-	CUDA_CHECK(cudaSetDevice(devSrc));
+	CUDA_CHECK(hipSetDevice(devSrc));
 	float* d_src = nullptr;
-	CUDA_CHECK(cudaMalloc(&d_src, n * sizeof(float)));
+	CUDA_CHECK(hipMalloc(&d_src, n * sizeof(float)));
 
-	CUDA_CHECK(cudaSetDevice(devDst));
+	CUDA_CHECK(hipSetDevice(devDst));
 	float* d_dst = nullptr;
-	CUDA_CHECK(cudaMalloc(&d_dst, n * sizeof(float)));
+	CUDA_CHECK(hipMalloc(&d_dst, n * sizeof(float)));
 
 	FIDESlib::TimelineSemaphore* d_flag = nullptr;
-	CUDA_CHECK(cudaMalloc(&d_flag, sizeof(uint32_t)));
-	CUDA_CHECK(cudaMemset(d_flag, 0, sizeof(uint32_t)));
+	CUDA_CHECK(hipMalloc(&d_flag, sizeof(uint32_t)));
+	CUDA_CHECK(hipMemset(d_flag, 0, sizeof(uint32_t)));
 
 	// Initialize host data and copy to src device
 	std::vector<float> h_src(n), h_dst(n);
 	init_host_data(h_src, 1.0f);
 
-	CUDA_CHECK(cudaSetDevice(devSrc));
-	CUDA_CHECK(cudaMemcpy(d_src, h_src.data(), n * sizeof(float), cudaMemcpyHostToDevice));
+	CUDA_CHECK(hipSetDevice(devSrc));
+	CUDA_CHECK(hipMemcpy(d_src, h_src.data(), n * sizeof(float), hipMemcpyHostToDevice));
 
 	// Launch transfer and notify kernels on src device
-	CUDA_CHECK(cudaSetDevice(devSrc));
-	cudaStream_t sSrc;
-	CUDA_CHECK(cudaStreamCreate(&sSrc));
+	CUDA_CHECK(hipSetDevice(devSrc));
+	hipStream_t sSrc;
+	CUDA_CHECK(hipStreamCreate(&sSrc));
 
-	CUDA_CHECK(cudaStreamBeginCapture(sSrc, cudaStreamCaptureModeGlobal));
+	CUDA_CHECK(hipStreamBeginCapture(sSrc, hipStreamCaptureModeGlobal));
 
-	CUDA_CHECK(cudaSetDevice(devDst));
-	cudaStream_t sDst;
-	CUDA_CHECK(cudaStreamCreate(&sDst));
+	CUDA_CHECK(hipSetDevice(devDst));
+	hipStream_t sDst;
+	CUDA_CHECK(hipStreamCreate(&sDst));
 
-	CUDA_CHECK(cudaSetDevice(devSrc));
+	CUDA_CHECK(hipSetDevice(devSrc));
 
-	cudaEvent_t event0;
-	CUDA_CHECK(cudaEventCreateWithFlags(&event0, cudaEventDisableTiming));
-	CUDA_CHECK(cudaEventRecord(event0, sSrc));
-	CUDA_CHECK(cudaStreamWaitEvent(sDst, event0));
+	hipEvent_t event0;
+	CUDA_CHECK(hipEventCreateWithFlags(&event0, hipEventDisableTiming));
+	CUDA_CHECK(hipEventRecord(event0, sSrc));
+	CUDA_CHECK(hipStreamWaitEvent(sDst, event0));
 
-	CUDA_CHECK(cudaEventDestroy(event0));
+	CUDA_CHECK(hipEventDestroy(event0));
 
 	if (0) {
 		int threads = 256;
@@ -205,7 +205,7 @@ static void run_p2p_test_graph(int devSrc, int devDst, size_t n) {
 	} else {
 		FIDESlib::transferKernel(d_src, d_dst, n, sSrc, devSrc, devDst);
 	}
-	CUDA_CHECK(cudaGetLastError());
+	CUDA_CHECK(hipGetLastError());
 
 	uint32_t expectedValue = 1;
 
@@ -214,7 +214,7 @@ static void run_p2p_test_graph(int devSrc, int devDst, size_t n) {
 	} else {
 		FIDESlib::notifyKernel(d_flag, expectedValue, sSrc);
 	}
-	CUDA_CHECK(cudaGetLastError());
+	CUDA_CHECK(hipGetLastError());
 
 	// On destination device, wait for flag and then read back
 
@@ -224,79 +224,79 @@ static void run_p2p_test_graph(int devSrc, int devDst, size_t n) {
 		FIDESlib::pollingKernel(d_flag, expectedValue, sDst);
 	}
 
-	CUDA_CHECK(cudaGetLastError());
+	CUDA_CHECK(hipGetLastError());
 
-	cudaEvent_t event1;
+	hipEvent_t event1;
 
-	CUDA_CHECK(cudaSetDevice(devDst));
-	CUDA_CHECK(cudaEventCreateWithFlags(&event1, cudaEventDisableTiming));
-	CUDA_CHECK(cudaEventRecord(event1, sDst));
-	CUDA_CHECK(cudaStreamWaitEvent(sSrc, event1));
+	CUDA_CHECK(hipSetDevice(devDst));
+	CUDA_CHECK(hipEventCreateWithFlags(&event1, hipEventDisableTiming));
+	CUDA_CHECK(hipEventRecord(event1, sDst));
+	CUDA_CHECK(hipStreamWaitEvent(sSrc, event1));
 
-	CUDA_CHECK(cudaEventDestroy(event1));
+	CUDA_CHECK(hipEventDestroy(event1));
 	{
-		cudaGraph_t graph;
-		CUDA_CHECK(cudaStreamEndCapture(sSrc, &graph));
+		hipGraph_t graph;
+		CUDA_CHECK(hipStreamEndCapture(sSrc, &graph));
 
-		cudaGraphExec_t exec;
-		CUDA_CHECK(cudaGraphInstantiate(&exec, graph));
+		hipGraphExec_t exec;
+		CUDA_CHECK(hipGraphInstantiate(&exec, graph));
 
-		CUDA_CHECK(cudaGraphLaunch(exec, sSrc));
+		CUDA_CHECK(hipGraphLaunch(exec, sSrc));
 		CudaCheckErrorMod;
-		CUDA_CHECK(cudaGraphDestroy(graph));
-		CUDA_CHECK(cudaGraphExecDestroy(exec));
+		CUDA_CHECK(hipGraphDestroy(graph));
+		CUDA_CHECK(hipGraphExecDestroy(exec));
 		CudaCheckErrorMod;
 	}
 
 	// Wait for destination stream to finish (i.e., transfer+notify complete)
-	CUDA_CHECK(cudaStreamSynchronize(sDst));
-	CUDA_CHECK(cudaStreamSynchronize(sSrc));
+	CUDA_CHECK(hipStreamSynchronize(sDst));
+	CUDA_CHECK(hipStreamSynchronize(sSrc));
 	// Copy dst back to host from destination device
-	CUDA_CHECK(cudaMemcpy(h_dst.data(), d_dst, n * sizeof(float), cudaMemcpyDeviceToHost));
+	CUDA_CHECK(hipMemcpy(h_dst.data(), d_dst, n * sizeof(float), hipMemcpyDeviceToHost));
 
 	// Verify correctness
 	expect_equal(h_src, h_dst);
 
 	// Cleanup
-	CUDA_CHECK(cudaStreamDestroy(sSrc));
-	CUDA_CHECK(cudaStreamDestroy(sDst));
+	CUDA_CHECK(hipStreamDestroy(sSrc));
+	CUDA_CHECK(hipStreamDestroy(sDst));
 
-	CUDA_CHECK(cudaSetDevice(devSrc));
-	CUDA_CHECK(cudaFree(d_src));
+	CUDA_CHECK(hipSetDevice(devSrc));
+	CUDA_CHECK(hipFree(d_src));
 
-	CUDA_CHECK(cudaSetDevice(devDst));
-	CUDA_CHECK(cudaFree(d_dst));
-	CUDA_CHECK(cudaFree(d_flag));
+	CUDA_CHECK(hipSetDevice(devDst));
+	CUDA_CHECK(hipFree(d_dst));
+	CUDA_CHECK(hipFree(d_flag));
 }
 
 static void run_p2p_test_graph_parallel(int devSrc, int devDst, size_t n) {
-	CUDA_CHECK(cudaSetDevice(devSrc));
+	CUDA_CHECK(hipSetDevice(devSrc));
 	float* d_src = nullptr;
-	CUDA_CHECK(cudaMalloc(&d_src, n * sizeof(float)));
+	CUDA_CHECK(hipMalloc(&d_src, n * sizeof(float)));
 
-	CUDA_CHECK(cudaSetDevice(devDst));
+	CUDA_CHECK(hipSetDevice(devDst));
 	float* d_dst = nullptr;
-	CUDA_CHECK(cudaMalloc(&d_dst, n * sizeof(float)));
+	CUDA_CHECK(hipMalloc(&d_dst, n * sizeof(float)));
 
 	FIDESlib::TimelineSemaphore* d_flag = nullptr;
-	CUDA_CHECK(cudaMalloc(&d_flag, sizeof(uint32_t)));
-	CUDA_CHECK(cudaMemset(d_flag, 0, sizeof(uint32_t)));
+	CUDA_CHECK(hipMalloc(&d_flag, sizeof(uint32_t)));
+	CUDA_CHECK(hipMemset(d_flag, 0, sizeof(uint32_t)));
 
 	// Initialize host data and copy to src device
 	std::vector<float> h_src(n), h_dst(n);
 	init_host_data(h_src, 1.0f);
 
-	CUDA_CHECK(cudaSetDevice(devSrc));
-	CUDA_CHECK(cudaMemcpy(d_src, h_src.data(), n * sizeof(float), cudaMemcpyHostToDevice));
+	CUDA_CHECK(hipSetDevice(devSrc));
+	CUDA_CHECK(hipMemcpy(d_src, h_src.data(), n * sizeof(float), hipMemcpyHostToDevice));
 
 	uint32_t expectedValue = 1;
 
-	CUDA_CHECK(cudaSetDevice(devSrc));
-	cudaStream_t sSrc;
-	CUDA_CHECK(cudaStreamCreate(&sSrc));
-	CUDA_CHECK(cudaSetDevice(devDst));
-	cudaStream_t sDst;
-	CUDA_CHECK(cudaStreamCreate(&sDst));
+	CUDA_CHECK(hipSetDevice(devSrc));
+	hipStream_t sSrc;
+	CUDA_CHECK(hipStreamCreate(&sSrc));
+	CUDA_CHECK(hipSetDevice(devDst));
+	hipStream_t sDst;
+	CUDA_CHECK(hipStreamCreate(&sDst));
 
 #pragma omp parallel num_threads(2)
 	{
@@ -304,11 +304,11 @@ static void run_p2p_test_graph_parallel(int devSrc, int devDst, size_t n) {
 
 		if (j == 1) {
 			// Launch transfer and notify kernels on src device
-			CUDA_CHECK(cudaSetDevice(devSrc));
+			CUDA_CHECK(hipSetDevice(devSrc));
 
-			CUDA_CHECK(cudaStreamBeginCapture(sSrc, cudaStreamCaptureModeThreadLocal));
+			CUDA_CHECK(hipStreamBeginCapture(sSrc, hipStreamCaptureModeThreadLocal));
 
-			CUDA_CHECK(cudaSetDevice(devSrc));
+			CUDA_CHECK(hipSetDevice(devSrc));
 
 			if (0) {
 				int threads = 256;
@@ -318,32 +318,32 @@ static void run_p2p_test_graph_parallel(int devSrc, int devDst, size_t n) {
 			} else {
 				FIDESlib::transferKernel(d_src, d_dst, n, sSrc, devSrc, devDst);
 			}
-			CUDA_CHECK(cudaGetLastError());
+			CUDA_CHECK(hipGetLastError());
 
 			if (0) {
 				FIDESlib::notify_kernel_hostpin<<<1, 32, 0, sSrc>>>(d_flag, expectedValue);
 			} else {
 				FIDESlib::notifyKernel(d_flag, expectedValue, sSrc);
 			}
-			CUDA_CHECK(cudaGetLastError());
+			CUDA_CHECK(hipGetLastError());
 
 			{
-				cudaGraph_t graph;
-				CUDA_CHECK(cudaStreamEndCapture(sSrc, &graph));
+				hipGraph_t graph;
+				CUDA_CHECK(hipStreamEndCapture(sSrc, &graph));
 
-				cudaGraphExec_t exec;
-				CUDA_CHECK(cudaGraphInstantiate(&exec, graph));
+				hipGraphExec_t exec;
+				CUDA_CHECK(hipGraphInstantiate(&exec, graph));
 
-				CUDA_CHECK(cudaGraphLaunch(exec, sSrc));
+				CUDA_CHECK(hipGraphLaunch(exec, sSrc));
 				CudaCheckErrorMod;
-				CUDA_CHECK(cudaGraphDestroy(graph));
-				CUDA_CHECK(cudaGraphExecDestroy(exec));
+				CUDA_CHECK(hipGraphDestroy(graph));
+				CUDA_CHECK(hipGraphExecDestroy(exec));
 				CudaCheckErrorMod;
 			}
 		} else {
-			CUDA_CHECK(cudaSetDevice(devDst));
+			CUDA_CHECK(hipSetDevice(devDst));
 			// On destination device, wait for flag and then read back
-			CUDA_CHECK(cudaStreamBeginCapture(sDst, cudaStreamCaptureModeThreadLocal));
+			CUDA_CHECK(hipStreamBeginCapture(sDst, hipStreamCaptureModeThreadLocal));
 
 			if (0) {
 				FIDESlib::hostpin_polling_kernel<<<1, 32, 0, sDst>>>(d_flag, expectedValue);
@@ -351,47 +351,47 @@ static void run_p2p_test_graph_parallel(int devSrc, int devDst, size_t n) {
 				FIDESlib::pollingKernel(d_flag, expectedValue, sDst);
 			}
 
-			CUDA_CHECK(cudaGetLastError());
+			CUDA_CHECK(hipGetLastError());
 
 			{
-				cudaGraph_t graph;
-				CUDA_CHECK(cudaStreamEndCapture(sDst, &graph));
+				hipGraph_t graph;
+				CUDA_CHECK(hipStreamEndCapture(sDst, &graph));
 
-				cudaGraphExec_t exec;
-				CUDA_CHECK(cudaGraphInstantiate(&exec, graph));
+				hipGraphExec_t exec;
+				CUDA_CHECK(hipGraphInstantiate(&exec, graph));
 
-				CUDA_CHECK(cudaGraphLaunch(exec, sDst));
+				CUDA_CHECK(hipGraphLaunch(exec, sDst));
 				CudaCheckErrorMod;
-				CUDA_CHECK(cudaGraphDestroy(graph));
-				CUDA_CHECK(cudaGraphExecDestroy(exec));
+				CUDA_CHECK(hipGraphDestroy(graph));
+				CUDA_CHECK(hipGraphExecDestroy(exec));
 				CudaCheckErrorMod;
 			}
 		}
 	}
 	// Wait for destination stream to finish (i.e., transfer+notify complete)
-	CUDA_CHECK(cudaStreamSynchronize(sDst));
-	CUDA_CHECK(cudaStreamSynchronize(sSrc));
+	CUDA_CHECK(hipStreamSynchronize(sDst));
+	CUDA_CHECK(hipStreamSynchronize(sSrc));
 	// Copy dst back to host from destination device
-	CUDA_CHECK(cudaMemcpy(h_dst.data(), d_dst, n * sizeof(float), cudaMemcpyDeviceToHost));
+	CUDA_CHECK(hipMemcpy(h_dst.data(), d_dst, n * sizeof(float), hipMemcpyDeviceToHost));
 
 	// Verify correctness
 	expect_equal(h_src, h_dst);
 
 	// Cleanup
-	CUDA_CHECK(cudaStreamDestroy(sSrc));
-	CUDA_CHECK(cudaStreamDestroy(sDst));
+	CUDA_CHECK(hipStreamDestroy(sSrc));
+	CUDA_CHECK(hipStreamDestroy(sDst));
 
-	CUDA_CHECK(cudaSetDevice(devSrc));
-	CUDA_CHECK(cudaFree(d_src));
+	CUDA_CHECK(hipSetDevice(devSrc));
+	CUDA_CHECK(hipFree(d_src));
 
-	CUDA_CHECK(cudaSetDevice(devDst));
-	CUDA_CHECK(cudaFree(d_dst));
-	CUDA_CHECK(cudaFree(d_flag));
+	CUDA_CHECK(hipSetDevice(devDst));
+	CUDA_CHECK(hipFree(d_dst));
+	CUDA_CHECK(hipFree(d_flag));
 }
 
 TEST(P2PTransferTest, SingleGPU) {
 	int deviceCount = 0;
-	CUDA_CHECK(cudaGetDeviceCount(&deviceCount));
+	CUDA_CHECK(hipGetDeviceCount(&deviceCount));
 	ASSERT_GE(deviceCount, 1) << "Need at least 1 GPU";
 
 	int dev	 = 0;
@@ -402,7 +402,7 @@ TEST(P2PTransferTest, SingleGPU) {
 
 TEST(P2PTransferTest, SingleGPUGraph) {
 	int deviceCount = 0;
-	CUDA_CHECK(cudaGetDeviceCount(&deviceCount));
+	CUDA_CHECK(hipGetDeviceCount(&deviceCount));
 	ASSERT_GE(deviceCount, 1) << "Need at least 1 GPU";
 
 	int dev	 = 0;
@@ -414,7 +414,7 @@ TEST(P2PTransferTest, SingleGPUGraph) {
 // 2. Two-GPU test: devSrc != devDst, with P2P if available
 TEST(P2PTransferTest, MultiGPUIfAvailable) {
 	int deviceCount = 0;
-	CUDA_CHECK(cudaGetDeviceCount(&deviceCount));
+	CUDA_CHECK(hipGetDeviceCount(&deviceCount));
 	if (deviceCount < 2) {
 		GTEST_SKIP() << "Less than 2 GPUs; skipping multi-GPU test";
 	}
@@ -423,8 +423,8 @@ TEST(P2PTransferTest, MultiGPUIfAvailable) {
 	int devDst = 1;
 
 	int canAccessSrcToDst = 0, canAccessDstToSrc = 0;
-	CUDA_CHECK(cudaDeviceCanAccessPeer(&canAccessSrcToDst, devSrc, devDst));
-	CUDA_CHECK(cudaDeviceCanAccessPeer(&canAccessDstToSrc, devDst, devSrc));
+	CUDA_CHECK(hipDeviceCanAccessPeer(&canAccessSrcToDst, devSrc, devDst));
+	CUDA_CHECK(hipDeviceCanAccessPeer(&canAccessDstToSrc, devDst, devSrc));
 
 	if (!canAccessSrcToDst || !canAccessDstToSrc) {
 		GTEST_SKIP() << "P2P not available between GPU " << devSrc << " and GPU " << devDst << "; skipping";
@@ -440,7 +440,7 @@ TEST(P2PTransferTest, MultiGPUIfAvailable) {
 
 TEST(P2PTransferTest, MultiGPUIfAvailableSingleGraph) {
 	int deviceCount = 0;
-	CUDA_CHECK(cudaGetDeviceCount(&deviceCount));
+	CUDA_CHECK(hipGetDeviceCount(&deviceCount));
 	if (deviceCount < 2) {
 		GTEST_SKIP() << "Less than 2 GPUs; skipping multi-GPU test";
 	}
@@ -449,8 +449,8 @@ TEST(P2PTransferTest, MultiGPUIfAvailableSingleGraph) {
 	int devDst = 1;
 
 	int canAccessSrcToDst = 0, canAccessDstToSrc = 0;
-	CUDA_CHECK(cudaDeviceCanAccessPeer(&canAccessSrcToDst, devSrc, devDst));
-	CUDA_CHECK(cudaDeviceCanAccessPeer(&canAccessDstToSrc, devDst, devSrc));
+	CUDA_CHECK(hipDeviceCanAccessPeer(&canAccessSrcToDst, devSrc, devDst));
+	CUDA_CHECK(hipDeviceCanAccessPeer(&canAccessDstToSrc, devDst, devSrc));
 
 	if (!canAccessSrcToDst || !canAccessDstToSrc) {
 		GTEST_SKIP() << "P2P not available between GPU " << devSrc << " and GPU " << devDst << "; skipping";
@@ -466,7 +466,7 @@ TEST(P2PTransferTest, MultiGPUIfAvailableSingleGraph) {
 
 TEST(P2PTransferTest, MultiGPUIfAvailableParallelGraphs) {
 	int deviceCount = 0;
-	CUDA_CHECK(cudaGetDeviceCount(&deviceCount));
+	CUDA_CHECK(hipGetDeviceCount(&deviceCount));
 	if (deviceCount < 2) {
 		GTEST_SKIP() << "Less than 2 GPUs; skipping multi-GPU test";
 	}
@@ -475,8 +475,8 @@ TEST(P2PTransferTest, MultiGPUIfAvailableParallelGraphs) {
 	int devDst = 1;
 
 	int canAccessSrcToDst = 0, canAccessDstToSrc = 0;
-	CUDA_CHECK(cudaDeviceCanAccessPeer(&canAccessSrcToDst, devSrc, devDst));
-	CUDA_CHECK(cudaDeviceCanAccessPeer(&canAccessDstToSrc, devDst, devSrc));
+	CUDA_CHECK(hipDeviceCanAccessPeer(&canAccessSrcToDst, devSrc, devDst));
+	CUDA_CHECK(hipDeviceCanAccessPeer(&canAccessDstToSrc, devDst, devSrc));
 
 	if (!canAccessSrcToDst || !canAccessDstToSrc) {
 		GTEST_SKIP() << "P2P not available between GPU " << devSrc << " and GPU " << devDst << "; skipping";
@@ -519,17 +519,17 @@ static void benchmark_p2p_transfer(int devSrc, int devDst, size_t num_elements, 
 	result.num_blocks		= num_blocks;
 	result.is_p2p			= is_p2p;
 
-	CUDA_CHECK(cudaSetDevice(devSrc));
+	CUDA_CHECK(hipSetDevice(devSrc));
 	float* d_src = nullptr;
-	CUDA_CHECK(cudaMalloc(&d_src, num_elements * sizeof(float)));
+	CUDA_CHECK(hipMalloc(&d_src, num_elements * sizeof(float)));
 
-	CUDA_CHECK(cudaSetDevice(devDst));
+	CUDA_CHECK(hipSetDevice(devDst));
 	float* d_dst = nullptr;
-	CUDA_CHECK(cudaMalloc(&d_dst, num_elements * sizeof(float)));
+	CUDA_CHECK(hipMalloc(&d_dst, num_elements * sizeof(float)));
 
 	uint32_t* d_flag = nullptr;
-	CUDA_CHECK(cudaMalloc(&d_flag, sizeof(uint32_t)));
-	CUDA_CHECK(cudaMemset(d_flag, 0, sizeof(uint32_t)));
+	CUDA_CHECK(hipMalloc(&d_flag, sizeof(uint32_t)));
+	CUDA_CHECK(hipMemset(d_flag, 0, sizeof(uint32_t)));
 
 	// Initialize src
 	std::vector<float> h_src(num_elements);
@@ -537,90 +537,90 @@ static void benchmark_p2p_transfer(int devSrc, int devDst, size_t num_elements, 
 		h_src[i] = static_cast<float>(i) * 0.001f;
 	}
 
-	CUDA_CHECK(cudaSetDevice(devSrc));
-	CUDA_CHECK(cudaMemcpy(d_src, h_src.data(), num_elements * sizeof(float), cudaMemcpyHostToDevice));
+	CUDA_CHECK(hipSetDevice(devSrc));
+	CUDA_CHECK(hipMemcpy(d_src, h_src.data(), num_elements * sizeof(float), hipMemcpyHostToDevice));
 
 	// Create CUDA events for timing
-	cudaEvent_t e_transfer_start, e_transfer_end, e_notify_end, e_poll_end;
-	CUDA_CHECK(cudaSetDevice(devSrc));
-	CUDA_CHECK(cudaEventCreate(&e_transfer_start));
-	CUDA_CHECK(cudaEventCreate(&e_transfer_end));
+	hipEvent_t e_transfer_start, e_transfer_end, e_notify_end, e_poll_end;
+	CUDA_CHECK(hipSetDevice(devSrc));
+	CUDA_CHECK(hipEventCreate(&e_transfer_start));
+	CUDA_CHECK(hipEventCreate(&e_transfer_end));
 
-	CUDA_CHECK(cudaEventCreate(&e_notify_end));
-	CUDA_CHECK(cudaSetDevice(devDst));
-	CUDA_CHECK(cudaEventCreate(&e_poll_end));
+	CUDA_CHECK(hipEventCreate(&e_notify_end));
+	CUDA_CHECK(hipSetDevice(devDst));
+	CUDA_CHECK(hipEventCreate(&e_poll_end));
 
 	// Warmup run (no timing)
 	{
-		CUDA_CHECK(cudaSetDevice(devSrc));
-		cudaStream_t sSrc;
-		CUDA_CHECK(cudaStreamCreate(&sSrc));
+		CUDA_CHECK(hipSetDevice(devSrc));
+		hipStream_t sSrc;
+		CUDA_CHECK(hipStreamCreate(&sSrc));
 
 		int threads = 128;
 		FIDESlib::p2p_transfer_1d<<<num_blocks, threads, 0, sSrc>>>(d_src, d_dst, num_elements);
 		FIDESlib::notify_kernel<<<1, 32, 0, sSrc>>>(d_flag, 1);
 
-		CUDA_CHECK(cudaSetDevice(devDst));
-		cudaStream_t sDst;
-		CUDA_CHECK(cudaStreamCreate(&sDst));
+		CUDA_CHECK(hipSetDevice(devDst));
+		hipStream_t sDst;
+		CUDA_CHECK(hipStreamCreate(&sDst));
 		FIDESlib::p2p_polling_kernel<<<1, 32, 0, sDst>>>(d_flag, 1);
-		CUDA_CHECK(cudaStreamSynchronize(sDst));
+		CUDA_CHECK(hipStreamSynchronize(sDst));
 
-		CUDA_CHECK(cudaStreamDestroy(sSrc));
-		CUDA_CHECK(cudaStreamDestroy(sDst));
-		CUDA_CHECK(cudaSetDevice(devDst));
-		CUDA_CHECK(cudaMemset(d_flag, 0, sizeof(uint32_t)));
+		CUDA_CHECK(hipStreamDestroy(sSrc));
+		CUDA_CHECK(hipStreamDestroy(sDst));
+		CUDA_CHECK(hipSetDevice(devDst));
+		CUDA_CHECK(hipMemset(d_flag, 0, sizeof(uint32_t)));
 	}
 
 	// Actual benchmark: multiple iterations
 	const int num_iterations = 10;
 	std::vector<float> gpu_times, host_times;
 
-	CUDA_CHECK(cudaSetDevice(devSrc));
-	cudaStream_t sSrc;
-	CUDA_CHECK(cudaStreamCreate(&sSrc));
-	CUDA_CHECK(cudaSetDevice(devDst));
-	cudaStream_t sDst;
-	CUDA_CHECK(cudaStreamCreate(&sDst));
+	CUDA_CHECK(hipSetDevice(devSrc));
+	hipStream_t sSrc;
+	CUDA_CHECK(hipStreamCreate(&sSrc));
+	CUDA_CHECK(hipSetDevice(devDst));
+	hipStream_t sDst;
+	CUDA_CHECK(hipStreamCreate(&sDst));
 	for (int iter = 0; iter < num_iterations; ++iter) {
-		CUDA_CHECK(cudaSetDevice(devDst));
-		CUDA_CHECK(cudaMemset(d_flag, 0, sizeof(uint32_t)));
+		CUDA_CHECK(hipSetDevice(devDst));
+		CUDA_CHECK(hipMemset(d_flag, 0, sizeof(uint32_t)));
 
 		// Host-side timer start (includes everything)
 		auto t_host_start = std::chrono::high_resolution_clock::now();
 
-		CUDA_CHECK(cudaSetDevice(devSrc));
+		CUDA_CHECK(hipSetDevice(devSrc));
 
 		// GPU-side timer: transfer kernel start
-		CUDA_CHECK(cudaEventRecord(e_transfer_start, sSrc));
+		CUDA_CHECK(hipEventRecord(e_transfer_start, sSrc));
 
 		int threads = 128;
 		FIDESlib::p2p_transfer_1d<<<num_blocks, threads, 0, sSrc>>>(d_src, d_dst, num_elements);
-		CUDA_CHECK(cudaGetLastError());
+		CUDA_CHECK(hipGetLastError());
 
 		// GPU-side marker: transfer complete
-		CUDA_CHECK(cudaEventRecord(e_transfer_end, sSrc));
+		CUDA_CHECK(hipEventRecord(e_transfer_end, sSrc));
 
 		uint32_t expected_value = iter + 1;
 		FIDESlib::notify_kernel<<<1, 32, 0, sSrc>>>(d_flag, expected_value);
-		CUDA_CHECK(cudaGetLastError());
+		CUDA_CHECK(hipGetLastError());
 
 		// GPU-side marker: notify complete
-		CUDA_CHECK(cudaEventRecord(e_notify_end, sSrc));
+		CUDA_CHECK(hipEventRecord(e_notify_end, sSrc));
 
 		// GPU1: wait for completion
-		CUDA_CHECK(cudaSetDevice(devDst));
+		CUDA_CHECK(hipSetDevice(devDst));
 
 		// GPU-side marker: polling start
 		// CUDA_CHECK(cudaEventRecord(e_poll_start, sDst));  // Record before poll
 
 		FIDESlib::p2p_polling_kernel<<<1, 32, 0, sDst>>>(d_flag, expected_value);
-		CUDA_CHECK(cudaGetLastError());
+		CUDA_CHECK(hipGetLastError());
 
 		// GPU-side marker: polling complete
-		CUDA_CHECK(cudaEventRecord(e_poll_end, sDst));
+		CUDA_CHECK(hipEventRecord(e_poll_end, sDst));
 
-		CUDA_CHECK(cudaStreamSynchronize(sDst));
+		CUDA_CHECK(hipStreamSynchronize(sDst));
 
 		// Host-side timer end
 		auto t_host_end		   = std::chrono::high_resolution_clock::now();
@@ -629,9 +629,9 @@ static void benchmark_p2p_transfer(int devSrc, int devDst, size_t num_elements, 
 		// GPU-side timing via events
 		float transfer_ms = 0.0f, notify_ms = 0.0f;
 		// float poll_ms = 0.0f;
-		CUDA_CHECK(cudaEventSynchronize(e_notify_end));
-		CUDA_CHECK(cudaEventElapsedTime(&transfer_ms, e_transfer_start, e_transfer_end));
-		CUDA_CHECK(cudaEventElapsedTime(&notify_ms, e_transfer_end, e_notify_end));
+		CUDA_CHECK(hipEventSynchronize(e_notify_end));
+		CUDA_CHECK(hipEventElapsedTime(&transfer_ms, e_transfer_start, e_transfer_end));
+		CUDA_CHECK(hipEventElapsedTime(&notify_ms, e_transfer_end, e_notify_end));
 
 		// Polling time: from before poll to after poll
 		// (Note: This includes busy-wait spin time)
@@ -643,10 +643,10 @@ static void benchmark_p2p_transfer(int devSrc, int devDst, size_t num_elements, 
 	}
 
 	// Cleanup events
-	CUDA_CHECK(cudaEventDestroy(e_transfer_start));
-	CUDA_CHECK(cudaEventDestroy(e_transfer_end));
-	CUDA_CHECK(cudaEventDestroy(e_notify_end));
-	CUDA_CHECK(cudaEventDestroy(e_poll_end));
+	CUDA_CHECK(hipEventDestroy(e_transfer_start));
+	CUDA_CHECK(hipEventDestroy(e_transfer_end));
+	CUDA_CHECK(hipEventDestroy(e_notify_end));
+	CUDA_CHECK(hipEventDestroy(e_poll_end));
 
 	// Calculate averages
 	double avg_gpu_time_ms	= 0.0;
@@ -666,22 +666,22 @@ static void benchmark_p2p_transfer(int devSrc, int devDst, size_t num_elements, 
 	result.gpu_only_overhead_us = (avg_host_time_ms - avg_gpu_time_ms) * 1000.0; // Overhead in μs
 
 	// Cleanup
-	CUDA_CHECK(cudaSetDevice(devSrc));
-	CUDA_CHECK(cudaFree(d_src));
+	CUDA_CHECK(hipSetDevice(devSrc));
+	CUDA_CHECK(hipFree(d_src));
 
-	CUDA_CHECK(cudaSetDevice(devDst));
-	CUDA_CHECK(cudaFree(d_dst));
-	CUDA_CHECK(cudaFree(d_flag));
+	CUDA_CHECK(hipSetDevice(devDst));
+	CUDA_CHECK(hipFree(d_dst));
+	CUDA_CHECK(hipFree(d_flag));
 }
 
 // Benchmark test: single GPU, vary block count and transfer size
 TEST(P2PBenchmark, SingleGPUVariableBlocksAndSizes) {
 	int deviceCount = 0;
-	CUDA_CHECK(cudaGetDeviceCount(&deviceCount));
+	CUDA_CHECK(hipGetDeviceCount(&deviceCount));
 	ASSERT_GE(deviceCount, 1) << "Need at least 1 GPU";
 
 	int dev = 0;
-	CUDA_CHECK(cudaSetDevice(dev));
+	CUDA_CHECK(hipSetDevice(dev));
 
 	// Transfer sizes: 1 MB, 10 MB, 50 MB, 100 MB, 256 MB, 512 MB
 	std::vector<double> transfer_sizes_mb = { 0.001, 0.25, 0.5, 1, 10, 50, 100, 256, 512 };
@@ -710,7 +710,7 @@ TEST(P2PBenchmark, SingleGPUVariableBlocksAndSizes) {
 // Benchmark test: multi GPU with P2P if available
 TEST(P2PBenchmark, MultiGPUVariableBlocksAndSizes) {
 	int deviceCount = 0;
-	CUDA_CHECK(cudaGetDeviceCount(&deviceCount));
+	CUDA_CHECK(hipGetDeviceCount(&deviceCount));
 	if (deviceCount < 2) {
 		GTEST_SKIP() << "Less than 2 GPUs; skipping multi-GPU benchmark";
 	}
@@ -719,8 +719,8 @@ TEST(P2PBenchmark, MultiGPUVariableBlocksAndSizes) {
 	int devDst = 1;
 
 	int canAccessSrcToDst = 0, canAccessDstToSrc = 0;
-	CUDA_CHECK(cudaDeviceCanAccessPeer(&canAccessSrcToDst, devSrc, devDst));
-	CUDA_CHECK(cudaDeviceCanAccessPeer(&canAccessDstToSrc, devDst, devSrc));
+	CUDA_CHECK(hipDeviceCanAccessPeer(&canAccessSrcToDst, devSrc, devDst));
+	CUDA_CHECK(hipDeviceCanAccessPeer(&canAccessDstToSrc, devDst, devSrc));
 
 	if (!canAccessSrcToDst || !canAccessDstToSrc) {
 		GTEST_SKIP() << "P2P not available between GPU " << devSrc << " and GPU " << devDst << "; skipping";
@@ -838,15 +838,15 @@ TEST(APIbench, APIbenchmark) {
 		for (int i = 0; i < total_size; ++i) {
 			if (i > 0 && SINGLE_ALLOC)
 				continue;
-			cudaMallocAsync(&chunks[i], chunk_size * 1024, s1.ptr());
+			hipMallocAsync(&chunks[i], chunk_size * 1024, s1.ptr());
 			// ncclMemAlloc((void**)&chunks[i], chunk_size * 1024 * 1024);
 			std::vector<char> mem(chunk_size, 0);
 			// for (auto j : mem)
 			//     j = rand() % 256;
-			cudaMemcpyAsync(chunks[i], mem.data(), chunk_size * 1024, cudaMemcpyDefault, s1.ptr());
+			hipMemcpyAsync(chunks[i], mem.data(), chunk_size * 1024, hipMemcpyDefault, s1.ptr());
 		}
 
-		cudaDeviceSynchronize();
+		hipDeviceSynchronize();
 		auto start = std::chrono::high_resolution_clock::now();
 		for (int i = 0; i < 10000; ++i) {
 			int sel = rand() % total_size;
@@ -861,10 +861,10 @@ TEST(APIbench, APIbenchmark) {
 		for (int i = 0; i < total_size; ++i) {
 			if (i > 0 && SINGLE_ALLOC)
 				continue;
-			cudaFreeAsync(chunks[i], s1.ptr());
+			hipFreeAsync(chunks[i], s1.ptr());
 			// ncclMemFree(chunks[i]);
 		}
-		cudaDeviceSynchronize();
+		hipDeviceSynchronize();
 	}
 }
 

@@ -29,7 +29,7 @@ BENCHMARK_DEFINE_F(GeneralFixture, CiphertextRotation)(benchmark::State& state) 
 	}
 
 	int devcount = -1;
-	cudaGetDeviceCount(&devcount);
+	hipGetDeviceCount(&devcount);
 	std::vector<int> GPUs = generalTestParams.GPUs;
 
 	fideslibParams.batch				= state.range(2);
@@ -128,7 +128,7 @@ BENCHMARK_DEFINE_F(GeneralFixture, CiphertextHoistedRotation)(benchmark::State& 
 	}
 
 	int devcount = -1;
-	cudaGetDeviceCount(&devcount);
+	hipGetDeviceCount(&devcount);
 	std::vector<int> GPUs = generalTestParams.GPUs;
 
 	fideslibParams.batch				= state.range(2);
@@ -243,7 +243,7 @@ BENCHMARK_DEFINE_F(GeneralFixture, CiphertextRotateAndAccumulate)(benchmark::Sta
 	}
 
 	int devcount = -1;
-	cudaGetDeviceCount(&devcount);
+	hipGetDeviceCount(&devcount);
 	std::vector<int> GPUs = generalTestParams.GPUs;
 
 	fideslibParams.batch				= state.range(2);

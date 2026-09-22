@@ -32,7 +32,7 @@ Limb<T>::Limb(ContextData& context, const int id, Stream& stream, const int prim
 	// assert(stream.ptr() != nullptr);
 	// assert(stream.ev != nullptr);
 	int dev;
-	cudaGetDevice(&dev);
+	hipGetDevice(&dev);
 	assert(this->v.size == cc.N);
 	assert(dev == v.device);
 }
@@ -54,7 +54,7 @@ Limb<T>::Limb(ContextData& context, T* data, const int offset, const int id, Str
 	// assert(stream.ev != nullptr);
 
 	int dev;
-	cudaGetDevice(&dev);
+	hipGetDevice(&dev);
 	assert(this->v.size == cc.N);
 	assert(dev == v.device);
 }
@@ -69,8 +69,8 @@ template <typename T> void Limb<T>::store(std::vector<T>& dat) const {
 	// cudaHostRegister((void*)dat.data(), dat.size() * sizeof(T), cudaHostRegisterDefault);
 	// cudaMemcpyAsync((void *) dat.data(), v.data, dat.size() * sizeof(T), cudaMemcpyDeviceToHost, stream.ptr());
 
-	cudaMemcpyAsync((void*)dat.data(), v.data, dat.size() * sizeof(T), cudaMemcpyDeviceToHost, stream.ptr());
-	cudaStreamSynchronize(stream.ptr());
+	hipMemcpyAsync((void*)dat.data(), v.data, dat.size() * sizeof(T), hipMemcpyDeviceToHost, stream.ptr());
+	hipStreamSynchronize(stream.ptr());
 	// cudaDeviceSynchronize();
 	// cudaHostUnregister((void*)dat.data());
 }
@@ -78,7 +78,7 @@ template <typename T> void Limb<T>::store(std::vector<T>& dat) const {
 template <typename T> template <typename Q> void Limb<T>::load(const std::vector<Q>& dat_) {
 	assert(dat_.size() <= v.size);
 	int device = -1;
-	cudaGetDevice(&device);
+	hipGetDevice(&device);
 	// std::cout << v.device << " " << device << ",";
 	std::vector<T> dat;
 	if constexpr (!std::is_same<T, Q>().value) {
@@ -92,7 +92,7 @@ template <typename T> template <typename Q> void Limb<T>::load(const std::vector
 
 	// cudaHostRegister((void *) dat.data(), dat.size() * sizeof(T), cudaHostRegisterDefault);
 	// cudaDeviceSynchronize();
-	cudaMemcpyAsync(v.data, dat.data(), dat.size() * sizeof(T), cudaMemcpyHostToDevice, stream.ptr());
+	hipMemcpyAsync(v.data, dat.data(), dat.size() * sizeof(T), hipMemcpyHostToDevice, stream.ptr());
 	// cudaDeviceSynchronize();
 	// cudaHostUnregister((void *) dat.data());
 }
@@ -106,7 +106,7 @@ template void Limb<uint64_t>::load<uint32_t>(const std::vector<uint32_t>& dat_);
 template void Limb<uint64_t>::load<uint64_t>(const std::vector<uint64_t>& dat_);
 
 template <typename T> void Limb<T>::load(const VectorGPU<T>& dat) {
-	cudaMemcpyAsync(v.data, dat.data, v.size, cudaMemcpyDeviceToDevice, stream.ptr());
+	hipMemcpyAsync(v.data, dat.data, v.size, hipMemcpyDeviceToDevice, stream.ptr());
 }
 
 template <typename T> template <typename Q> void Limb<T>::load_convert(const std::vector<Q>& dat_raw) {
@@ -277,10 +277,10 @@ template <typename T> template <ALGO algo> void Limb<T>::NTT() {
 
 		int primeid_  = primeid;
 		void* args[6] = { getGlobals(), &v.data, (void*)&primeid_, &aux.data, (void*)&primeid_, (void*)&primeid_ };
-		cudaLaunchCooperativeKernel(get_NTT_reference(false) /*(void *) test_kernel*/ /*(void *) NTT_<T, false, algo>*/, gridDim, blockDim, args, bytes, stream.ptr());
+		hipLaunchCooperativeKernel(reinterpret_cast<const void*>(get_NTT_reference(false) /*(void *) test_kernel*/ /*(void *) NTT_<T, false, algo>*/), gridDim, blockDim, args, bytes, stream.ptr());
 		// CudaCheckErrorModNoSync;
 	} else if constexpr (1) {
-		static std::map<int, cudaGraphExec_t> exec;
+		static std::map<int, hipGraphExec_t> exec;
 
 		run_in_graph<false>(exec[primeid], stream, [&]() {
 			assert(primeid >= 0);
@@ -396,7 +396,7 @@ template <> void Limb<uint64_t>::NTT_multpt_fused(const LimbImpl& _l, const Limb
 	assert(_l.index() == U64);
 	assert(_pt.index() == U64);
 
-	static std::map<int, cudaGraphExec_t> exec;
+	static std::map<int, hipGraphExec_t> exec;
 
 	// run_in_graph<false>(exec[primeid], stream, [&]()
 	{
@@ -450,7 +450,7 @@ template <typename T> Limb<T> Limb<T>::clone() {
 
 	stream.wait(res.stream);
 
-	cudaMemcpyAsync(res.v.data, v.data, v.size * sizeof(T), cudaMemcpyDeviceToDevice, stream.ptr());
+	hipMemcpyAsync(res.v.data, v.data, v.size * sizeof(T), hipMemcpyDeviceToDevice, stream.ptr());
 
 	res.stream.wait(stream);
 
@@ -466,12 +466,12 @@ template <typename T> void Limb<T>::copyV(const LimbImpl& l) {
 
 template <> void Limb<uint32_t>::copyV(const Limb<uint32_t>& l) {
 	// stream.wait(l.stream);
-	cudaMemcpyAsync(v.data, l.v.data, sizeof(uint32_t) * v.size, cudaMemcpyDefault, stream.ptr());
+	hipMemcpyAsync(v.data, l.v.data, sizeof(uint32_t) * v.size, hipMemcpyDefault, stream.ptr());
 }
 
 template <> void Limb<uint64_t>::copyV(const Limb<uint64_t>& l) {
 	// stream.wait(l.stream);
-	cudaMemcpyAsync(v.data, l.v.data, sizeof(uint64_t) * v.size, cudaMemcpyDefault, stream.ptr());
+	hipMemcpyAsync(v.data, l.v.data, sizeof(uint64_t) * v.size, hipMemcpyDefault, stream.ptr());
 }
 
 template <> void Limb<uint64_t>::copyV(const Limb<uint32_t>& l) {

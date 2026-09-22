@@ -19,9 +19,9 @@ class BaseTest : public FIDESlibParametrizedTest {};
 
 TEST_P(BaseTest, ConstructVectorGPU) {
 	int devcount = -1;
-	cudaGetDeviceCount(&devcount);
+	hipGetDeviceCount(&devcount);
 	for (int i = 0; i < devcount; ++i) {
-		cudaSetDevice(i);
+		hipSetDevice(i);
 		FIDESlib::Stream s;
 		s.init();
 		CudaCheckErrorMod;
@@ -35,14 +35,14 @@ TEST_P(BaseTest, ConstructVectorGPU) {
 
 	// Freeing in a different Stream.
 	for (int i = 0; i < devcount; ++i) {
-		cudaSetDevice(i);
+		hipSetDevice(i);
 		FIDESlib::Stream s;
 		s.init();
 		FIDESlib::Stream s2;
 		s2.init();
 		FIDESlib::VectorGPU<int> gpuvec(s, 1, i);
 
-		cudaStreamSynchronize(s.ptr());
+		hipStreamSynchronize(s.ptr());
 
 		gpuvec.free(s2);
 		// implicit destruction expected now
@@ -50,25 +50,25 @@ TEST_P(BaseTest, ConstructVectorGPU) {
 	CudaCheckErrorMod;
 
 	for (int i = 0; i < devcount; ++i) {
-		cudaSetDevice(i);
+		hipSetDevice(i);
 		int* ptr;
-		cudaMalloc(&ptr, 1);
+		hipMalloc(&ptr, 1);
 
 		FIDESlib::VectorGPU<int> gpuvec(ptr, 1, i);
 
-		cudaFree(ptr);
+		hipFree(ptr);
 		// implicit destruction expected now
 	}
 	CudaCheckErrorMod;
 
 	for (int i = 0; i < devcount; ++i) {
-		cudaSetDevice(i);
+		hipSetDevice(i);
 		int* ptr;
-		cudaMalloc(&ptr, 10);
+		hipMalloc(&ptr, 10);
 
 		FIDESlib::VectorGPU<int> gpuvec(ptr, 5, i, 5);
 
-		cudaFree(ptr);
+		hipFree(ptr);
 		// implicit destruction expected now
 	}
 	CudaCheckErrorMod;
@@ -78,7 +78,7 @@ TEST_P(BaseTest, ConstructVectorGPU) {
 
 TEST_P(BaseTest, ConstructLimb) {
 	int devcount = -1;
-	cudaGetDeviceCount(&devcount);
+	hipGetDeviceCount(&devcount);
 
 	std::vector<int> GPUs;
 	for (int i = 0; i < devcount; ++i) {
@@ -90,7 +90,7 @@ TEST_P(BaseTest, ConstructLimb) {
 
 	// Constructor memoria automática:
 	for (int i = 0; i < devcount; ++i) {
-		cudaSetDevice(i);
+		hipSetDevice(i);
 		FIDESlib::Stream s;
 		s.init();
 
@@ -130,7 +130,7 @@ TEST_P(BaseTest, ConstructLimb) {
 
 TEST_P(BaseTest, ConstructRNSPoly) {
 	int devcount = -1;
-	cudaGetDeviceCount(&devcount);
+	hipGetDeviceCount(&devcount);
 
 	std::vector<int> GPUs = devices;
 	// for (int i = 0; i < devcount; ++i) GPUs.push_back(i);

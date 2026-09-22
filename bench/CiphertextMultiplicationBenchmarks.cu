@@ -29,7 +29,7 @@ BENCHMARK_DEFINE_F(GeneralFixture, CiphertextMultiplication)(benchmark::State& s
 	}
 
 	int devcount = -1;
-	cudaGetDeviceCount(&devcount);
+	hipGetDeviceCount(&devcount);
 
 	std::vector<int> GPUs = generalTestParams.GPUs;
 
@@ -110,7 +110,7 @@ BENCHMARK_DEFINE_F(GeneralFixture, CiphertextSquaring)(benchmark::State& state) 
 	}
 
 	int devcount = -1;
-	cudaGetDeviceCount(&devcount);
+	hipGetDeviceCount(&devcount);
 
 	std::vector<int> GPUs = generalTestParams.GPUs;
 
@@ -167,7 +167,7 @@ BENCHMARK_DEFINE_F(GeneralFixture, MultScalar)(benchmark::State& state) {
 	}
 
 	int devcount = -1;
-	cudaGetDeviceCount(&devcount);
+	hipGetDeviceCount(&devcount);
 
 	std::vector<int> GPUs = generalTestParams.GPUs;
 

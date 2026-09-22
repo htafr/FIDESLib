@@ -1,36 +1,37 @@
+#include "hip/hip_runtime.h"
 //
 // Created by carlosad on 22/12/25.
 //
 #include "PeerUtils.cuh"
-#include <cuda_runtime.h>
+#include <hip/hip_runtime.h>
 #include <iostream>
 #include <vector>
 
 #include "CudaUtils.cuh"
 
-std::vector<cudaGraphNode_t> get_current_capture_dependencies(cudaStream_t s) {
-	cudaStreamCaptureStatus status;
-	cudaGraphNode_t* depNodes = nullptr;
+std::vector<hipGraphNode_t> get_current_capture_dependencies(hipStream_t s) {
+	hipStreamCaptureStatus status;
+	hipGraphNode_t* depNodes = nullptr;
 	size_t numDeps			  = 0;
 
-	cudaError_t err = cudaStreamGetCaptureInfo(s, &status, nullptr, nullptr, ((const cudaGraphNode_t**)&depNodes), &numDeps);
+	hipError_t err = hipStreamGetCaptureInfo(s, &status, nullptr, nullptr, ((const hipGraphNode_t**)&depNodes), &numDeps);
 
-	std::vector<cudaGraphNode_t> deps;
-	if (err == cudaSuccess && numDeps > 0 && depNodes) {
+	std::vector<hipGraphNode_t> deps;
+	if (err == hipSuccess && numDeps > 0 && depNodes) {
 		deps.assign(depNodes, depNodes + numDeps);
 	}
 	return deps;
 }
 
-static void launch(cudaFunction_t kernel, dim3 grid, dim3 block, void** args, uint32_t args_size, cudaStream_t s) {
+static void launch(hipFunction_t kernel, dim3 grid, dim3 block, void** args, uint32_t args_size, hipStream_t s) {
 	// === Step 1: Snapshot current graph dependencies BEFORE launch ===
 	// These are the nodes that must complete before our kernel
 	CudaCheckErrorModNoSync;
-	std::vector<cudaGraphNode_t> deps_before = get_current_capture_dependencies(s);
+	std::vector<hipGraphNode_t> deps_before = get_current_capture_dependencies(s);
 	std::cout << "[P2P] Dependencies before launch: " << deps_before.size() << std::endl;
 
 	CudaCheckErrorModNoSync;
-	CUlaunchAttribute attr[] = { { .id = CU_LAUNCH_ATTRIBUTE_MEM_SYNC_DOMAIN, .value = { .memSyncDomain = CU_LAUNCH_MEM_SYNC_DOMAIN_REMOTE } },
+	hipLaunchAttribute attr[] = { { .id = hipLaunchAttributeMemSyncDomain, .value = { .memSyncDomain = hipLaunchMemSyncDomainRemote } },
 		{ .id = CU_LAUNCH_ATTRIBUTE_DEVICE_UPDATABLE_KERNEL_NODE, .value = { .deviceUpdatableKernelNode = { .deviceUpdatable = 1, .devNode = nullptr } } } };
 
 	// void* extra[] = { CU_LAUNCH_PARAM_BUFFER_POINTER, args, CU_LAUNCH_PARAM_BUFFER_SIZE, &args_size, CU_LAUNCH_PARAM_END };
@@ -65,7 +66,7 @@ static void launch(cudaFunction_t kernel, dim3 grid, dim3 block, void** args, ui
 #endif
 */
 
-	CUlaunchConfig config = {
+	HIP_LAUNCH_CONFIG config = {
 		.gridDimX		= grid.x,
 		.gridDimY		= grid.y,
 		.gridDimZ		= grid.z,
@@ -75,15 +76,15 @@ static void launch(cudaFunction_t kernel, dim3 grid, dim3 block, void** args, ui
 		.sharedMemBytes = 0, // grid, block, shared memory
 		.hStream		= s, // stream
 		.attrs			= attr,
-		.numAttrs		= sizeof(attr) / sizeof(CUlaunchAttribute),
+		.numAttrs		= sizeof(attr) / sizeof(hipLaunchAttribute),
 	};
 
 	// This bypasses some capture restrictions
-	CUresult launchResult = cuLaunchKernelEx(&config, kernel, args /*nullptr*/, nullptr /*extra*/);
+	hipError_t launchResult = hipDrvLaunchKernelEx(&config, kernel, args /*nullptr*/, nullptr /*extra*/);
 	// CUresult launchResult = cuLaunchKernelExC(&config, &p2p_polling_kernel, args);
 	// CUresult launchResult = cuLaunchKernel(kernel, 1, 1, 1, 32, 1, 1, 0, s, args, nullptr);
 
-	if (launchResult != CUDA_SUCCESS) {
+	if (launchResult != hipSuccess) {
 		std::cerr << "Failed to launch kernel: " << launchResult << "\n";
 		CudaCheckErrorModNoSync;
 		return;
@@ -94,43 +95,43 @@ static void launch(cudaFunction_t kernel, dim3 grid, dim3 block, void** args, ui
 	if (0) {
 		// === Step 7: Retrieve snapshot of graph AFTER launch ===
 		// NCCL explicitly updates capture dependencies after cuLaunchKernelEx
-		cudaError_t err = cudaStreamUpdateCaptureDependencies(s, // The capturing stream
+		hipError_t err = hipStreamUpdateCaptureDependencies(s, // The capturing stream
 		  nullptr,												 // No specific nodes to depend on
 		  0,													 // No additional nodes
-		  cudaStreamAddCaptureDependencies						 // Add implicit dependencies
+		  hipStreamAddCaptureDependencies						 // Add implicit dependencies
 		);
 
 		CudaCheckErrorModNoSync;
 
-		if (err != cudaSuccess) {
-			std::cerr << "[P2P] WARNING: cudaStreamUpdateCaptureDependencies failed: " << cudaGetErrorString(err) << "\n";
+		if (err != hipSuccess) {
+			std::cerr << "[P2P] WARNING: hipStreamUpdateCaptureDependencies failed: " << hipGetErrorString(err) << "\n";
 		} else {
 			std::cout << "[P2P] Capture dependencies updated\n";
 		}
 
 		// === Step 8: Get the newly captured graph info ===
 		// At this point, a new kernel node should be in the graph
-		cudaStreamCaptureStatus status;
-		cudaGraph_t captured_graph		  = nullptr;
-		cudaGraphNode_t* deps_after_array = nullptr;
+		hipStreamCaptureStatus status;
+		hipGraph_t captured_graph		  = nullptr;
+		hipGraphNode_t* deps_after_array = nullptr;
 		size_t numDeps_after			  = 0;
 
-		err = cudaStreamGetCaptureInfo(s,
+		err = hipStreamGetCaptureInfo(s,
 		  &status,
 		  nullptr, // captureID (optional)
 		  &captured_graph,
-		  (const cudaGraphNode_t**)&deps_after_array,
+		  (const hipGraphNode_t**)&deps_after_array,
 		  &numDeps_after);
 
-		if (err != cudaSuccess) {
-			std::cerr << "[P2P] ERROR: Failed to get capture info: " << cudaGetErrorString(err) << "\n";
+		if (err != hipSuccess) {
+			std::cerr << "[P2P] ERROR: Failed to get capture info: " << hipGetErrorString(err) << "\n";
 			return;
 		}
 
-		std::cout << "[P2P] Capture status: " << (status == cudaStreamCaptureStatusActive ? "ACTIVE" : "INACTIVE") << "\n";
+		std::cout << "[P2P] Capture status: " << (status == hipStreamCaptureStatusActive ? "ACTIVE" : "INACTIVE") << "\n";
 		std::cout << "[P2P] Current capture dependencies: " << numDeps_after << "\n";
 
-		std::vector<cudaGraphNode_t> deps_after;
+		std::vector<hipGraphNode_t> deps_after;
 		if (numDeps_after > 0 && deps_after_array) {
 			deps_after.assign(deps_after_array, deps_after_array + numDeps_after);
 		}
@@ -138,23 +139,23 @@ static void launch(cudaFunction_t kernel, dim3 grid, dim3 block, void** args, ui
 		// === Step 9: Get all nodes in the graph to identify the new kernel node ===
 		if (captured_graph) {
 			size_t numNodes = 0;
-			err				= cudaGraphGetNodes(captured_graph, nullptr, &numNodes);
+			err				= hipGraphGetNodes(captured_graph, nullptr, &numNodes);
 
-			if (err == cudaSuccess && numNodes > 0) {
-				std::vector<cudaGraphNode_t> all_nodes(numNodes);
-				err = cudaGraphGetNodes(captured_graph, all_nodes.data(), &numNodes);
+			if (err == hipSuccess && numNodes > 0) {
+				std::vector<hipGraphNode_t> all_nodes(numNodes);
+				err = hipGraphGetNodes(captured_graph, all_nodes.data(), &numNodes);
 
-				if (err == cudaSuccess) {
+				if (err == hipSuccess) {
 					std::cout << "[P2P] Graph now contains " << numNodes << " total nodes\n";
 
 					// The last node in the graph is likely our newly added kernel
 					// But let's examine more carefully
 					if (!all_nodes.empty()) {
-						cudaGraphNode_t latest_node = all_nodes.back();
-						cudaGraphNodeType nodeType;
+						hipGraphNode_t latest_node = all_nodes.back();
+						hipGraphNodeType nodeType;
 
-						err = cudaGraphNodeGetType(latest_node, &nodeType);
-						if (err == cudaSuccess && nodeType == cudaGraphNodeTypeKernel) {
+						err = hipGraphNodeGetType(latest_node, &nodeType);
+						if (err == hipSuccess && nodeType == hipGraphNodeTypeKernel) {
 							std::cout << "[P2P] Latest node is a KERNEL node\n";
 
 							/*
@@ -172,14 +173,14 @@ static void launch(cudaFunction_t kernel, dim3 grid, dim3 block, void** args, ui
 							if (!deps_before.empty()) {
 								std::cout << "[P2P] Adding explicit dependencies from " << deps_before.size() << " predecessor nodes\n";
 								CudaCheckErrorModNoSync;
-								err = cudaGraphAddDependencies(captured_graph,
+								err = hipGraphAddDependencies(captured_graph,
 								  deps_before.data(), // From these nodes
 								  &latest_node,		  // To this kernel node
 								  deps_before.size()  // This many dependencies
 								);
 								CudaCheckErrorModNoSync;
-								if (err != cudaSuccess) {
-									std::cerr << "[P2P] ERROR: Failed to add dependencies: " << cudaGetErrorString(err) << "\n";
+								if (err != hipSuccess) {
+									std::cerr << "[P2P] ERROR: Failed to add dependencies: " << hipGetErrorString(err) << "\n";
 								} else {
 									std::cout << "[P2P] Dependencies added successfully\n";
 								}
@@ -197,7 +198,7 @@ static void launch(cudaFunction_t kernel, dim3 grid, dim3 block, void** args, ui
 
 namespace FIDESlib {
 
-void pollingKernel(TimelineSemaphore* gpu1_complete_flag, uint64_t value, cudaStream_t s) {
+void pollingKernel(TimelineSemaphore* gpu1_complete_flag, uint64_t value, hipStream_t s) {
 	return;
 	if (1 || !is_stream_being_captured(s)) {
 		// p2p_polling_kernel<<<1, 32, 0, s>>>(gpu1_complete_flag, value);
@@ -208,9 +209,9 @@ void pollingKernel(TimelineSemaphore* gpu1_complete_flag, uint64_t value, cudaSt
 		if (0) {
 			void* args[] = { &gpu1_complete_flag, &value };
 
-			cudaFunction_t kernel;
+			hipFunction_t kernel;
 			CudaCheckErrorModNoSync;
-			cudaGetFuncBySymbol(&kernel, (const void*)&p2p_polling_kernel);
+			hipGetFuncBySymbol(&kernel, (const void*)&p2p_polling_kernel);
 			CudaCheckErrorModNoSync;
 
 			launch(kernel, 1, 32, args, 2, s);
@@ -218,19 +219,19 @@ void pollingKernel(TimelineSemaphore* gpu1_complete_flag, uint64_t value, cudaSt
 
 	} else {
 		// Get the current capturing graph context
-		cudaStreamCaptureStatus capture_status;
-		cudaGraph_t capturing_graph;
-		const cudaGraphNode_t* deps;
+		hipStreamCaptureStatus capture_status;
+		hipGraph_t capturing_graph;
+		const hipGraphNode_t* deps;
 		size_t dep_count;
 
-		cudaStreamGetCaptureInfo(s, &capture_status, nullptr, &capturing_graph, &deps, &dep_count);
+		hipStreamGetCaptureInfo(s, &capture_status, nullptr, &capturing_graph, &deps, &dep_count);
 
 		// ========================================================================
 		// Create peer access kernel node with V2 parameters (supports attributes)
 		// ========================================================================
 
 		// Setup kernel parameters with launch attributes
-		cudaKernelNodeParams kernel_params = { 0 };
+		hipKernelNodeParams kernel_params = { 0 };
 		kernel_params.func				   = (void*)p2p_polling_kernel;
 		kernel_params.gridDim			   = { 1, 1, 1 };
 		kernel_params.blockDim			   = { 32, 1, 1 };
@@ -242,21 +243,21 @@ void pollingKernel(TimelineSemaphore* gpu1_complete_flag, uint64_t value, cudaSt
 		kernel_params.extra		   = nullptr;
 
 		// Add the kernel node to the capturing graph
-		cudaGraphNode_t peer_kernel_node;
-		cudaGraphAddKernelNode(&peer_kernel_node,
+		hipGraphNode_t peer_kernel_node;
+		hipGraphAddKernelNode(&peer_kernel_node,
 		  capturing_graph,
 		  deps,
 		  dep_count,
 		  /*cudaGraphNodeTypeKernel,*/ &kernel_params);
 
 		// ✅ CRITICAL: Set memory sync domain to REMOTE for peer access
-		cudaLaunchAttributeValue attr_value;
-		attr_value.memSyncDomain = cudaLaunchMemSyncDomainRemote;
+		hipLaunchAttributeValue attr_value;
+		attr_value.memSyncDomain = hipLaunchMemSyncDomainRemote;
 
-		cudaGraphKernelNodeSetAttribute(peer_kernel_node, cudaLaunchAttributeMemSyncDomain, &attr_value);
+		hipGraphKernelNodeSetAttribute(peer_kernel_node, hipLaunchAttributeMemSyncDomain, &attr_value);
 
 		// Update stream dependencies so subsequent work depends on peer kernel
-		cudaStreamUpdateCaptureDependencies(s, &peer_kernel_node, 1, 1);
+		hipStreamUpdateCaptureDependencies(s, &peer_kernel_node, 1, 1);
 	}
 }
 
@@ -270,7 +271,7 @@ __global__ void notify_kernel_hostpin(TimelineSemaphore* gpu_complete_flag, uint
 	}
 }
 
-void notifyKernel(TimelineSemaphore* gpu1_complete_flag, uint64_t value, cudaStream_t s) {
+void notifyKernel(TimelineSemaphore* gpu1_complete_flag, uint64_t value, hipStream_t s) {
 	return;
 	if (1 || !is_stream_being_captured(s)) {
 		notify_kernel_hostpin<<<1, 32, 0, s>>>(gpu1_complete_flag, value);
@@ -279,28 +280,28 @@ void notifyKernel(TimelineSemaphore* gpu1_complete_flag, uint64_t value, cudaStr
 
 		void* args[] = { &gpu1_complete_flag, &value };
 
-		cudaFunction_t kernel;
+		hipFunction_t kernel;
 		CudaCheckErrorModNoSync;
-		cudaGetFuncBySymbol(&kernel, (const void*)&notify_kernel);
+		hipGetFuncBySymbol(&kernel, (const void*)&notify_kernel);
 		CudaCheckErrorModNoSync;
 
 		launch(kernel, 1, 32, args, 2, s);
 
 	} else {
 		// Get the current capturing graph context
-		cudaStreamCaptureStatus capture_status;
-		cudaGraph_t capturing_graph;
-		const cudaGraphNode_t* deps;
+		hipStreamCaptureStatus capture_status;
+		hipGraph_t capturing_graph;
+		const hipGraphNode_t* deps;
 		size_t dep_count;
 
-		cudaStreamGetCaptureInfo(s, &capture_status, nullptr, &capturing_graph, &deps, &dep_count);
+		hipStreamGetCaptureInfo(s, &capture_status, nullptr, &capturing_graph, &deps, &dep_count);
 
 		// ========================================================================
 		// Create peer access kernel node with V2 parameters (supports attributes)
 		// ========================================================================
 
 		// Setup kernel parameters with launch attributes
-		cudaKernelNodeParams kernel_params = { 0 };
+		hipKernelNodeParams kernel_params = { 0 };
 		kernel_params.func				   = (void*)notify_kernel;
 		kernel_params.gridDim			   = { 1, 1, 1 };
 		kernel_params.blockDim			   = { 32, 1, 1 };
@@ -312,21 +313,21 @@ void notifyKernel(TimelineSemaphore* gpu1_complete_flag, uint64_t value, cudaStr
 		kernel_params.extra		   = nullptr;
 
 		// Add the kernel node to the capturing graph
-		cudaGraphNode_t peer_kernel_node;
-		cudaGraphAddKernelNode(&peer_kernel_node,
+		hipGraphNode_t peer_kernel_node;
+		hipGraphAddKernelNode(&peer_kernel_node,
 		  capturing_graph,
 		  deps,
 		  dep_count,
 		  /*cudaGraphNodeTypeKernel,*/ &kernel_params);
 
 		// ✅ CRITICAL: Set memory sync domain to REMOTE for peer access
-		cudaLaunchAttributeValue attr_value;
-		attr_value.memSyncDomain = cudaLaunchMemSyncDomainRemote;
+		hipLaunchAttributeValue attr_value;
+		attr_value.memSyncDomain = hipLaunchMemSyncDomainRemote;
 
-		cudaGraphKernelNodeSetAttribute(peer_kernel_node, cudaLaunchAttributeMemSyncDomain, &attr_value);
+		hipGraphKernelNodeSetAttribute(peer_kernel_node, hipLaunchAttributeMemSyncDomain, &attr_value);
 
 		// Update stream dependencies so subsequent work depends on peer kernel
-		cudaStreamUpdateCaptureDependencies(s, &peer_kernel_node, 1, 1);
+		hipStreamUpdateCaptureDependencies(s, &peer_kernel_node, 1, 1);
 	}
 }
 
@@ -349,28 +350,28 @@ __global__ void hostpin_polling_kernel(TimelineSemaphore* completion_flag, uint6
 	}
 }
 
-bool is_stream_being_captured(cudaStream_t stream) {
-	cudaStreamCaptureStatus capture_status;
-	cudaStreamGetCaptureInfo(stream, &capture_status, nullptr, nullptr, nullptr, nullptr);
+bool is_stream_being_captured(hipStream_t stream) {
+	hipStreamCaptureStatus capture_status;
+	hipStreamGetCaptureInfo(stream, &capture_status, nullptr, nullptr, nullptr, nullptr);
 
-	return capture_status == cudaStreamCaptureStatusActive;
+	return capture_status == hipStreamCaptureStatusActive;
 }
 
-void verify_all_streams_joined(cudaStream_t main_stream) {
+void verify_all_streams_joined(hipStream_t main_stream) {
 	// Check if we're in capture mode
-	cudaStreamCaptureStatus status;
-	cudaStreamIsCapturing(main_stream, &status);
+	hipStreamCaptureStatus status;
+	hipStreamIsCapturing(main_stream, &status);
 
-	if (status == cudaStreamCaptureStatusActive) {
+	if (status == hipStreamCaptureStatusActive) {
 		printf("Still capturing - about to end capture\n");
 
 		// Get all subsidiary streams involved
-		cudaGraph_t capturing_graph;
-		cudaStreamGetCaptureInfo(main_stream, &status, NULL, &capturing_graph, NULL, NULL);
+		hipGraph_t capturing_graph;
+		hipStreamGetCaptureInfo(main_stream, &status, NULL, &capturing_graph, NULL, NULL);
 
 		// Get all nodes to check for any outstanding work
 		size_t num_nodes;
-		cudaGraphGetNodes(capturing_graph, NULL, &num_nodes);
+		hipGraphGetNodes(capturing_graph, NULL, &num_nodes);
 
 		printf("Current nodes in capturing graph: %zu\n", num_nodes);
 
@@ -379,34 +380,34 @@ void verify_all_streams_joined(cudaStream_t main_stream) {
 	}
 }
 
-const char* getNodeTypeName(cudaGraphNodeType type) {
+const char* getNodeTypeName(hipGraphNodeType type) {
 	switch (type) {
-	case cudaGraphNodeTypeKernel: return "Kernel";
-	case cudaGraphNodeTypeMemcpy: return "Memcpy";
-	case cudaGraphNodeTypeMemset: return "Memset";
-	case cudaGraphNodeTypeHost: return "Host";
-	case cudaGraphNodeTypeGraph: return "Graph";
-	case cudaGraphNodeTypeEmpty: return "Empty";
-	case cudaGraphNodeTypeWaitEvent: return "WaitEvent";
-	case cudaGraphNodeTypeEventRecord: return "EventRecord";
+	case hipGraphNodeTypeKernel: return "Kernel";
+	case hipGraphNodeTypeMemcpy: return "Memcpy";
+	case hipGraphNodeTypeMemset: return "Memset";
+	case hipGraphNodeTypeHost: return "Host";
+	case hipGraphNodeTypeGraph: return "Graph";
+	case hipGraphNodeTypeEmpty: return "Empty";
+	case hipGraphNodeTypeWaitEvent: return "WaitEvent";
+	case hipGraphNodeTypeEventRecord: return "EventRecord";
 	default: return "Unknown";
 	}
 }
 
-void printGraphDependencies(cudaGraph_t graph, const char* name) {
+void printGraphDependencies(hipGraph_t graph, const char* name) {
 	printf("\n================== GRAPH: %s ==================\n", name);
 
 	// Get all nodes
 	size_t num_nodes;
-	cudaGraphGetNodes(graph, NULL, &num_nodes);
+	hipGraphGetNodes(graph, NULL, &num_nodes);
 
 	if (num_nodes == 0) {
 		printf("⚠ Graph is empty (0 nodes)\n\n");
 		return;
 	}
 
-	std::vector<cudaGraphNode_t> nodes(num_nodes);
-	cudaGraphGetNodes(graph, nodes.data(), &num_nodes);
+	std::vector<hipGraphNode_t> nodes(num_nodes);
+	hipGraphGetNodes(graph, nodes.data(), &num_nodes);
 
 	printf("Total nodes: %zu\n\n", num_nodes);
 
@@ -418,24 +419,24 @@ void printGraphDependencies(cudaGraph_t graph, const char* name) {
 
 	// Print each node with full dependency info
 	for (size_t i = 0; i < num_nodes; i++) {
-		cudaGraphNodeType type;
-		cudaGraphNodeGetType(nodes[i], &type);
+		hipGraphNodeType type;
+		hipGraphNodeGetType(nodes[i], &type);
 
 		// Incoming edges (dependencies)
 		size_t num_incoming;
-		cudaGraphNodeGetDependencies(nodes[i], NULL, &num_incoming);
+		hipGraphNodeGetDependencies(nodes[i], NULL, &num_incoming);
 
 		// Outgoing edges (dependents)
 		size_t num_outgoing;
 
-		cudaGraphNodeGetDependentNodes(nodes[i], NULL, &num_outgoing);
+		hipGraphNodeGetDependentNodes(nodes[i], NULL, &num_outgoing);
 
 		printf("Node[%zu]: %s | Incoming: %zu | Outgoing: %zu\n", i, getNodeTypeName(type), num_incoming, num_outgoing);
 
 		// Print incoming edges
 		if (num_incoming > 0) {
-			std::vector<cudaGraphNode_t> deps(num_incoming);
-			cudaGraphNodeGetDependencies(nodes[i], deps.data(), &num_incoming);
+			std::vector<hipGraphNode_t> deps(num_incoming);
+			hipGraphNodeGetDependencies(nodes[i], deps.data(), &num_incoming);
 
 			printf("  ← Depends on: ");
 			for (size_t j = 0; j < num_incoming; j++) {
@@ -448,8 +449,8 @@ void printGraphDependencies(cudaGraph_t graph, const char* name) {
 
 		// Print outgoing edges
 		if (num_outgoing > 0) {
-			std::vector<cudaGraphNode_t> dependents(num_outgoing);
-			cudaGraphNodeGetDependentNodes(nodes[i], dependents.data(), &num_outgoing);
+			std::vector<hipGraphNode_t> dependents(num_outgoing);
+			hipGraphNodeGetDependentNodes(nodes[i], dependents.data(), &num_outgoing);
 
 			printf("  → Used by: ");
 			for (size_t j = 0; j < num_outgoing; j++) {
@@ -461,9 +462,9 @@ void printGraphDependencies(cudaGraph_t graph, const char* name) {
 		}
 
 		// Kernel-specific info
-		if (type == cudaGraphNodeTypeKernel) {
-			cudaKernelNodeParams params = {};
-			cudaGraphKernelNodeGetParams(nodes[i], &params);
+		if (type == hipGraphNodeTypeKernel) {
+			hipKernelNodeParams params = {};
+			hipGraphKernelNodeGetParams(nodes[i], &params);
 			printf("  Kernel: Grid(%u,%u,%u) Block(%u,%u,%u) Shared=%u\n",
 			  params.gridDim.x,
 			  params.gridDim.y,
@@ -482,7 +483,7 @@ void printGraphDependencies(cudaGraph_t graph, const char* name) {
 	int source_count = 0;
 	for (size_t i = 0; i < num_nodes; i++) {
 		size_t num_deps;
-		cudaGraphNodeGetDependencies(nodes[i], NULL, &num_deps);
+		hipGraphNodeGetDependencies(nodes[i], NULL, &num_deps);
 		if (num_deps == 0) {
 			printf("[%zu] ", i);
 			source_count++;
@@ -495,7 +496,7 @@ void printGraphDependencies(cudaGraph_t graph, const char* name) {
 	int sink_count = 0;
 	for (size_t i = 0; i < num_nodes; i++) {
 		size_t num_dependents;
-		cudaGraphNodeGetDependentNodes(nodes[i], NULL, &num_dependents);
+		hipGraphNodeGetDependentNodes(nodes[i], NULL, &num_dependents);
 		if (num_dependents == 0) {
 			printf("[%zu] ", i);
 			sink_count++;
@@ -509,7 +510,7 @@ void printGraphDependencies(cudaGraph_t graph, const char* name) {
 	for (size_t i = 0; i < num_nodes; i++) {
 		size_t num_deps;
 		size_t num_dependents = 0;
-		cudaGraphNodeGetDependentNodes(nodes[i], NULL, &num_deps);
+		hipGraphNodeGetDependentNodes(nodes[i], NULL, &num_deps);
 
 		// Orphaned if no incoming AND no outgoing (except sources/sinks)
 		if (num_deps == 0 && num_dependents == 0 && num_nodes > 1) {
@@ -525,7 +526,7 @@ void printGraphDependencies(cudaGraph_t graph, const char* name) {
 	printf("================================================\n\n");
 }
 
-bool pathExists(cudaGraphNode_t source, cudaGraphNode_t sink, const std::vector<cudaGraphNode_t>& all_nodes, std::set<uintptr_t>& visited) {
+bool pathExists(hipGraphNode_t source, hipGraphNode_t sink, const std::vector<hipGraphNode_t>& all_nodes, std::set<uintptr_t>& visited) {
 	if ((uintptr_t)source == (uintptr_t)sink)
 		return true;
 
@@ -533,11 +534,11 @@ bool pathExists(cudaGraphNode_t source, cudaGraphNode_t sink, const std::vector<
 
 	// Get dependents of source
 	size_t num_dependents;
-	cudaGraphNodeGetDependentNodes(source, NULL, &num_dependents);
+	hipGraphNodeGetDependentNodes(source, NULL, &num_dependents);
 
 	if (num_dependents > 0) {
-		std::vector<cudaGraphNode_t> dependents(num_dependents);
-		cudaGraphNodeGetDependentNodes(source, dependents.data(), &num_dependents);
+		std::vector<hipGraphNode_t> dependents(num_dependents);
+		hipGraphNodeGetDependentNodes(source, dependents.data(), &num_dependents);
 
 		for (auto& dep : dependents) {
 			if (visited.find((uintptr_t)dep) == visited.end()) {
@@ -551,12 +552,12 @@ bool pathExists(cudaGraphNode_t source, cudaGraphNode_t sink, const std::vector<
 	return false;
 }
 
-void printGraphDependencies2(cudaGraph_t graph, const char* name) {
+void printGraphDependencies2(hipGraph_t graph, const char* name) {
 	printf("\n================== GRAPH: %s ==================\n", name);
 
 	// Get all nodes
 	size_t num_nodes;
-	cudaGraphGetNodes(graph, NULL, &num_nodes);
+	hipGraphGetNodes(graph, NULL, &num_nodes);
 
 	if (num_nodes == 0) {
 		printf("⚠ Graph is empty (0 nodes)\n\n");
@@ -564,8 +565,8 @@ void printGraphDependencies2(cudaGraph_t graph, const char* name) {
 	}
 	CudaCheckErrorModNoSync;
 
-	std::vector<cudaGraphNode_t> nodes(num_nodes);
-	cudaGraphGetNodes(graph, nodes.data(), &num_nodes);
+	std::vector<hipGraphNode_t> nodes(num_nodes);
+	hipGraphGetNodes(graph, nodes.data(), &num_nodes);
 
 	printf("Total nodes: %zu\n\n", num_nodes);
 
@@ -578,21 +579,21 @@ void printGraphDependencies2(cudaGraph_t graph, const char* name) {
 	CudaCheckErrorModNoSync;
 	// Print each node
 	for (size_t i = 0; i < num_nodes; i++) {
-		cudaGraphNodeType type;
-		cudaGraphNodeGetType(nodes[i], &type);
+		hipGraphNodeType type;
+		hipGraphNodeGetType(nodes[i], &type);
 		CudaCheckErrorModNoSync;
 		size_t num_incoming;
-		cudaGraphNodeGetDependencies(nodes[i], NULL, &num_incoming);
+		hipGraphNodeGetDependencies(nodes[i], NULL, &num_incoming);
 		CudaCheckErrorModNoSync;
 		size_t num_outgoing;
-		cudaGraphNodeGetDependentNodes(nodes[i], NULL, &num_outgoing);
+		hipGraphNodeGetDependentNodes(nodes[i], NULL, &num_outgoing);
 		CudaCheckErrorModNoSync;
 		printf("Node[%zu]: %s | Incoming: %zu | Outgoing: %zu\n", i, getNodeTypeName(type), num_incoming, num_outgoing);
 
 		// Print incoming edges
 		if (num_incoming > 0) {
-			std::vector<cudaGraphNode_t> deps(num_incoming);
-			cudaGraphNodeGetDependencies(nodes[i], deps.data(), &num_incoming);
+			std::vector<hipGraphNode_t> deps(num_incoming);
+			hipGraphNodeGetDependencies(nodes[i], deps.data(), &num_incoming);
 			CudaCheckErrorModNoSync;
 			printf("  ← Depends on: ");
 			for (size_t j = 0; j < num_incoming; j++) {
@@ -605,8 +606,8 @@ void printGraphDependencies2(cudaGraph_t graph, const char* name) {
 
 		// Print outgoing edges
 		if (num_outgoing > 0) {
-			std::vector<cudaGraphNode_t> dependents(num_outgoing);
-			cudaGraphNodeGetDependentNodes(nodes[i], dependents.data(), &num_outgoing);
+			std::vector<hipGraphNode_t> dependents(num_outgoing);
+			hipGraphNodeGetDependentNodes(nodes[i], dependents.data(), &num_outgoing);
 			CudaCheckErrorModNoSync;
 			printf("  → Used by: ");
 			for (size_t j = 0; j < num_outgoing; j++) {
@@ -618,7 +619,7 @@ void printGraphDependencies2(cudaGraph_t graph, const char* name) {
 		}
 
 		// Kernel info
-		if (type == cudaGraphNodeTypeKernel) {
+		if (type == hipGraphNodeTypeKernel) {
 			// cudaKernelNodeParams params = {};
 			//  cudaGraphKernelNodeGetParams(nodes[i], &params);
 			//  CudaCheckErrorModNoSync;
@@ -635,7 +636,7 @@ void printGraphDependencies2(cudaGraph_t graph, const char* name) {
 	printf("Source nodes: ");
 	for (size_t i = 0; i < num_nodes; i++) {
 		size_t num_deps;
-		cudaGraphNodeGetDependencies(nodes[i], NULL, &num_deps);
+		hipGraphNodeGetDependencies(nodes[i], NULL, &num_deps);
 		if (num_deps == 0) {
 			printf("[%zu] ", i);
 			source_nodes.push_back(i);
@@ -648,7 +649,7 @@ void printGraphDependencies2(cudaGraph_t graph, const char* name) {
 	printf("Sink nodes: ");
 	for (size_t i = 0; i < num_nodes; i++) {
 		size_t num_dependents;
-		cudaGraphNodeGetDependentNodes(nodes[i], NULL, &num_dependents);
+		hipGraphNodeGetDependentNodes(nodes[i], NULL, &num_dependents);
 		if (num_dependents == 0) {
 			printf("[%zu] ", i);
 			sink_nodes.push_back(i);
@@ -665,13 +666,13 @@ void printGraphDependencies2(cudaGraph_t graph, const char* name) {
 
 		for (size_t sink_idx : sink_nodes) {
 			size_t num_incoming;
-			cudaGraphNodeGetDependencies(nodes[sink_idx], NULL, &num_incoming);
+			hipGraphNodeGetDependencies(nodes[sink_idx], NULL, &num_incoming);
 			CudaCheckErrorModNoSync;
 			printf("Sink[%zu]: Has %zu incoming dependencies\n", sink_idx, num_incoming);
 
 			// Get dependencies for this sink
-			std::vector<cudaGraphNode_t> deps(num_incoming);
-			cudaGraphNodeGetDependencies(nodes[sink_idx], deps.data(), &num_incoming);
+			std::vector<hipGraphNode_t> deps(num_incoming);
+			hipGraphNodeGetDependencies(nodes[sink_idx], deps.data(), &num_incoming);
 			CudaCheckErrorModNoSync;
 			printf("  Depends on: ");
 			for (size_t i = 0; i < num_incoming; i++) {
@@ -748,33 +749,33 @@ __global__ void p2p_transfer_1d(const float* src, float* dst, size_t n) {
 	}
 }
 
-void transferKernel(float* src, float* dst, size_t elems, cudaStream_t s, int src_dev, int dst_dev, size_t involved_sm) {
+void transferKernel(float* src, float* dst, size_t elems, hipStream_t s, int src_dev, int dst_dev, size_t involved_sm) {
 	// return;
 	if (is_stream_being_captured(s)) {
 
-		cudaGraph_t _capturing_graph;
-		cudaStreamCaptureStatus _capture_status;
-		const cudaGraphNode_t* _deps;
+		hipGraph_t _capturing_graph;
+		hipStreamCaptureStatus _capture_status;
+		const hipGraphNode_t* _deps;
 		size_t _dep_count;
-		cudaStreamGetCaptureInfo(s, &_capture_status, nullptr, &_capturing_graph, &_deps, &_dep_count);
+		hipStreamGetCaptureInfo(s, &_capture_status, nullptr, &_capturing_graph, &_deps, &_dep_count);
 
-		cudaGraphNode_t copy_0to1;
-		cudaMemcpy3DParms memcpyParams = { 0 };
+		hipGraphNode_t copy_0to1;
+		hipMemcpy3DParms memcpyParams = { 0 };
 
 		memset(&memcpyParams, 0, sizeof(memcpyParams));
 		memcpyParams.srcArray = NULL;
-		memcpyParams.srcPos	  = make_cudaPos(0, 0, 0);
-		memcpyParams.srcPtr	  = make_cudaPitchedPtr(src, elems * sizeof(float), elems * sizeof(float), 1);
+		memcpyParams.srcPos	  = make_hipPos(0, 0, 0);
+		memcpyParams.srcPtr	  = make_hipPitchedPtr(src, elems * sizeof(float), elems * sizeof(float), 1);
 
 		memcpyParams.dstArray = NULL;
-		memcpyParams.dstPos	  = make_cudaPos(0, 0, 0);
-		memcpyParams.dstPtr	  = make_cudaPitchedPtr(dst, elems * sizeof(float), elems * sizeof(float), 1);
-		memcpyParams.extent	  = make_cudaExtent(elems * sizeof(float), 1, 1);
-		memcpyParams.kind	  = cudaMemcpyDefault;
+		memcpyParams.dstPos	  = make_hipPos(0, 0, 0);
+		memcpyParams.dstPtr	  = make_hipPitchedPtr(dst, elems * sizeof(float), elems * sizeof(float), 1);
+		memcpyParams.extent	  = make_hipExtent(elems * sizeof(float), 1, 1);
+		memcpyParams.kind	  = hipMemcpyDefault;
 
-		cudaGraphAddMemcpyNode(&copy_0to1, _capturing_graph, _deps, _dep_count, &memcpyParams);
+		hipGraphAddMemcpyNode(&copy_0to1, _capturing_graph, _deps, _dep_count, &memcpyParams);
 
-		cudaStreamUpdateCaptureDependencies(s, &copy_0to1, 1, 1);
+		hipStreamUpdateCaptureDependencies(s, &copy_0to1, 1, 1);
 
 	} else if (!is_stream_being_captured(s)) {
 		// p2p_transfer_1d<<<involved_sm, 128, 0, s>>>(src, dst, elems);
@@ -783,34 +784,34 @@ void transferKernel(float* src, float* dst, size_t elems, cudaStream_t s, int sr
 		// cudaPointerGetAttributes(&attr_src, src);
 		// cudaPointerGetAttributes(&attr_dst, dst);
 		// std::cout << "src: " << attr_src.device << " dst: " << attr_dst.device << std::endl;
-		cudaMemcpyPeerAsync(dst, dst_dev, src, src_dev, elems * sizeof(float), s);
+		hipMemcpyPeerAsync(dst, dst_dev, src, src_dev, elems * sizeof(float), s);
 	} else if (1) {
 
 		CudaCheckErrorModNoSync;
 		void* args[] = { &src, &dst, &elems };
 
-		cudaFunction_t kernel;
+		hipFunction_t kernel;
 		CudaCheckErrorModNoSync;
-		cudaGetFuncBySymbol(&kernel, (const void*)&p2p_transfer_1d);
+		hipGetFuncBySymbol(&kernel, (const void*)&p2p_transfer_1d);
 		CudaCheckErrorModNoSync;
 
 		launch(kernel, involved_sm, 128, args, 3, s);
 		CudaCheckErrorModNoSync;
 	} else {
 		// Get the current capturing graph context
-		cudaStreamCaptureStatus capture_status;
-		cudaGraph_t capturing_graph;
-		const cudaGraphNode_t* deps;
+		hipStreamCaptureStatus capture_status;
+		hipGraph_t capturing_graph;
+		const hipGraphNode_t* deps;
 		size_t dep_count;
 
-		cudaStreamGetCaptureInfo(s, &capture_status, nullptr, &capturing_graph, &deps, &dep_count);
+		hipStreamGetCaptureInfo(s, &capture_status, nullptr, &capturing_graph, &deps, &dep_count);
 
 		// ========================================================================
 		// Create peer access kernel node with V2 parameters (supports attributes)
 		// ========================================================================
 
 		// Setup kernel parameters with launch attributes
-		cudaKernelNodeParams kernel_params = { 0 };
+		hipKernelNodeParams kernel_params = { 0 };
 		kernel_params.func				   = (void*)p2p_transfer_1d;
 		kernel_params.gridDim			   = { (uint32_t)involved_sm, 1, 1 };
 		kernel_params.blockDim			   = { 128, 1, 1 };
@@ -822,21 +823,21 @@ void transferKernel(float* src, float* dst, size_t elems, cudaStream_t s, int sr
 		kernel_params.extra		   = nullptr;
 
 		// Add the kernel node to the capturing graph
-		cudaGraphNode_t peer_kernel_node;
-		cudaGraphAddKernelNode(&peer_kernel_node,
+		hipGraphNode_t peer_kernel_node;
+		hipGraphAddKernelNode(&peer_kernel_node,
 		  capturing_graph,
 		  deps,
 		  dep_count,
 		  /*cudaGraphNodeTypeKernel,*/ &kernel_params);
 
 		// ✅ CRITICAL: Set memory sync domain to REMOTE for peer access
-		cudaLaunchAttributeValue attr_value;
-		attr_value.memSyncDomain = cudaLaunchMemSyncDomainRemote;
+		hipLaunchAttributeValue attr_value;
+		attr_value.memSyncDomain = hipLaunchMemSyncDomainRemote;
 
-		cudaGraphKernelNodeSetAttribute(peer_kernel_node, cudaLaunchAttributeMemSyncDomain, &attr_value);
+		hipGraphKernelNodeSetAttribute(peer_kernel_node, hipLaunchAttributeMemSyncDomain, &attr_value);
 
 		// Update stream dependencies so subsequent work depends on peer kernel
-		cudaStreamUpdateCaptureDependencies(s, &peer_kernel_node, 1, 1);
+		hipStreamUpdateCaptureDependencies(s, &peer_kernel_node, 1, 1);
 	}
 }
 

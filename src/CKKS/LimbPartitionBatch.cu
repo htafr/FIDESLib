@@ -1,3 +1,4 @@
+#include "hip/hip_runtime.h"
 //
 // Created by carlosad on 1/10/25.
 //
@@ -67,9 +68,9 @@ void LimbPartition::addBatchManyToOne(std::vector<LimbPartition*>& parta, const 
 	Stream& s = parta[0]->s;
 
 	void*** data_ptrs_d;
-	cudaMallocAsync(&data_ptrs_d, sizeof(void**) * size, s.ptr());
+	hipMallocAsync(&data_ptrs_d, sizeof(void**) * size, s.ptr());
 	// cudaMalloc(&data_ptrs_d, sizeof(void**) * size);
-	cudaMemcpyAsync(data_ptrs_d, data_ptrs.data(), sizeof(void**) * size, cudaMemcpyHostToDevice, s.ptr());
+	hipMemcpyAsync(data_ptrs_d, data_ptrs.data(), sizeof(void**) * size, hipMemcpyHostToDevice, s.ptr());
 	s.wait(partb[0]->s);
 	if (!sub) {
 		if (!exta && !extb) {
@@ -116,7 +117,7 @@ void LimbPartition::addBatchManyToOne(std::vector<LimbPartition*>& parta, const 
 		}
 	}
 	partb[0]->s.wait(s);
-	cudaFreeAsync(data_ptrs_d, s.ptr());
+	hipFreeAsync(data_ptrs_d, s.ptr());
 }
 
 void LimbPartition::multPtBatchManyToOne(std::vector<LimbPartition*>& parta, const std::vector<LimbPartition*>& partb, int stride, double usage) {
@@ -155,14 +156,14 @@ void LimbPartition::multPtBatchManyToOne(std::vector<LimbPartition*>& parta, con
 	Stream& s = parta[0]->s;
 
 	void*** data_ptrs_d;
-	cudaMallocAsync(&data_ptrs_d, sizeof(void**) * size, s.ptr());
+	hipMallocAsync(&data_ptrs_d, sizeof(void**) * size, s.ptr());
 	// cudaMalloc(&data_ptrs_d, sizeof(void**) * size);
-	cudaMemcpyAsync(data_ptrs_d, data_ptrs.data(), sizeof(void**) * size, cudaMemcpyHostToDevice, s.ptr());
+	hipMemcpyAsync(data_ptrs_d, data_ptrs.data(), sizeof(void**) * size, hipMemcpyHostToDevice, s.ptr());
 	s.wait(partb[0]->s);
 	if (limbsize > 0)
 		mult_reuse_b___<<<grid, block, 0, s.ptr()>>>(data_ptrs_d, data_ptrs_d + its * split * partb.size(), PARTITION(parta[0]->id, 0), n, its);
 	partb[0]->s.wait(s);
-	cudaFreeAsync(data_ptrs_d, s.ptr());
+	hipFreeAsync(data_ptrs_d, s.ptr());
 }
 
 void LimbPartition::addScalarBatchManyToOne(std::vector<LimbPartition*>& parta, const std::vector<std::vector<unsigned long int>>& vector, int stride, double usage) {
@@ -202,13 +203,13 @@ void LimbPartition::addScalarBatchManyToOne(std::vector<LimbPartition*>& parta, 
 	Stream& s = parta[0]->s;
 
 	void*** data_ptrs_d;
-	cudaMallocAsync(&data_ptrs_d, sizeof(void**) * size, s.ptr());
+	hipMallocAsync(&data_ptrs_d, sizeof(void**) * size, s.ptr());
 	// cudaMalloc(&data_ptrs_d, sizeof(void**) * size);
-	cudaMemcpyAsync(data_ptrs_d, data_ptrs.data(), sizeof(void**) * size, cudaMemcpyHostToDevice, s.ptr());
+	hipMemcpyAsync(data_ptrs_d, data_ptrs.data(), sizeof(void**) * size, hipMemcpyHostToDevice, s.ptr());
 
 	if (limbsize > 0)
 		add_scalar_reuse_b___<<<grid, block, 0, s.ptr()>>>(data_ptrs_d, data_ptrs_d + its * split * vector.size(), PARTITION(parta[0]->id, 0), n, its);
-	cudaFreeAsync(data_ptrs_d, s.ptr());
+	hipFreeAsync(data_ptrs_d, s.ptr());
 }
 
 void LimbPartition::multScalarBatchManyToOne(std::vector<LimbPartition*>& parta,
@@ -256,14 +257,14 @@ void LimbPartition::multScalarBatchManyToOne(std::vector<LimbPartition*>& parta,
 	Stream& s = parta[0]->s;
 
 	void*** data_ptrs_d;
-	cudaMallocAsync(&data_ptrs_d, sizeof(void**) * size, s.ptr());
+	hipMallocAsync(&data_ptrs_d, sizeof(void**) * size, s.ptr());
 	// cudaMalloc(&data_ptrs_d, sizeof(void**) * size);
-	cudaMemcpyAsync(data_ptrs_d, data_ptrs.data(), sizeof(void**) * size, cudaMemcpyHostToDevice, s.ptr());
+	hipMemcpyAsync(data_ptrs_d, data_ptrs.data(), sizeof(void**) * size, hipMemcpyHostToDevice, s.ptr());
 
 	if (limbsize > 0)
 		mult_scalar_reuse_b___<<<grid, block, 0, s.ptr()>>>(
 		  data_ptrs_d, data_ptrs_d + its * split * vector.size(), data_ptrs_d + its * split * vector.size() + split * vector.size() * MAXP, PARTITION(parta[0]->id, 0), n, its);
-	cudaFreeAsync(data_ptrs_d, s.ptr());
+	hipFreeAsync(data_ptrs_d, s.ptr());
 }
 
 void LimbPartition::LTdotProductPtBatch(std::vector<LimbPartition*>& out,
@@ -278,7 +279,7 @@ void LimbPartition::LTdotProductPtBatch(std::vector<LimbPartition*>& out,
 	constexpr bool VER2 = true;
 	constexpr bool VER3 = false;
 
-	cudaSetDevice(out[0]->device);
+	hipSetDevice(out[0]->device);
 	ContextData& cc	  = out[0]->cc;
 	int limbsize	  = out[0]->getLimbSize(*out[0]->level);
 	int slimbsize	  = cc.splitSpecialMeta.at(out[0]->id).size();
@@ -407,9 +408,9 @@ void LimbPartition::LTdotProductPtBatch(std::vector<LimbPartition*>& out,
 	Stream& s = in[0]->s;
 
 	void*** data_ptrs_d;
-	cudaMallocAsync(&data_ptrs_d, sizeof(void**) * size, s.ptr());
+	hipMallocAsync(&data_ptrs_d, sizeof(void**) * size, s.ptr());
 	// cudaMalloc(&data_ptrs_d, sizeof(void**) * size);
-	cudaMemcpyAsync(data_ptrs_d, data_ptrs.data(), sizeof(void**) * size, cudaMemcpyHostToDevice, s.ptr());
+	hipMemcpyAsync(data_ptrs_d, data_ptrs.data(), sizeof(void**) * size, hipMemcpyHostToDevice, s.ptr());
 	s.wait(out[0]->s);
 	s.wait(pt[0]->s);
 
@@ -487,7 +488,7 @@ void LimbPartition::LTdotProductPtBatch(std::vector<LimbPartition*>& out,
 	}
 	out[0]->s.wait(s);
 	pt[0]->s.wait(s);
-	cudaFreeAsync(data_ptrs_d, s.ptr());
+	hipFreeAsync(data_ptrs_d, s.ptr());
 }
 
 void LimbPartition::fusedHoistedRotateBatch(std::vector<LimbPartition*>& out,
@@ -585,9 +586,9 @@ void LimbPartition::fusedHoistedRotateBatch(std::vector<LimbPartition*>& out,
 	Stream& s = in[0]->s;
 
 	void*** data_ptrs_d;
-	cudaMallocAsync(&data_ptrs_d, sizeof(void**) * size, s.ptr());
+	hipMallocAsync(&data_ptrs_d, sizeof(void**) * size, s.ptr());
 	// cudaMalloc(&data_ptrs_d, sizeof(void**) * size);
-	cudaMemcpyAsync(data_ptrs_d, data_ptrs.data(), sizeof(void**) * size, cudaMemcpyHostToDevice, s.ptr());
+	hipMemcpyAsync(data_ptrs_d, data_ptrs.data(), sizeof(void**) * size, hipMemcpyHostToDevice, s.ptr());
 	s.wait(out[0]->s);
 	s.wait(ksk_a[0] ? ksk_a[0]->s : ksk_a[1]->s);
 
@@ -611,7 +612,7 @@ void LimbPartition::fusedHoistedRotateBatch(std::vector<LimbPartition*>& out,
 
 	out[0]->s.wait(s);
 	(ksk_a[0] ? ksk_a[0]->s : ksk_a[1]->s).wait(s);
-	cudaFreeAsync(data_ptrs_d, s.ptr());
+	hipFreeAsync(data_ptrs_d, s.ptr());
 }
 
 } // namespace FIDESlib::CKKS

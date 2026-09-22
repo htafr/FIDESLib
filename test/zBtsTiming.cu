@@ -71,14 +71,14 @@ TEST_P(BtsTimingTests, Regular) {
 	auto start_gpu = std::chrono::high_resolution_clock::now();
 	for (int i = 0; i < N; i++) {
 		Bootstrap(GPUct1, numSlots, false);
-		cudaDeviceSynchronize();
+		hipDeviceSynchronize();
 	}
 	auto end_gpu = std::chrono::high_resolution_clock::now();
 	std::cout << "took: " << (std::chrono::duration_cast<std::chrono::milliseconds>(end_gpu - start_gpu).count()) / N << " ms." << std::endl;
 
 	std::cout << GPUct1.getLevel() << std::endl;
 
-	cudaDeviceSynchronize();
+	hipDeviceSynchronize();
 
 	FIDESlib::CKKS::RawCipherText raw_res;
 	GPUct1.store(raw_res);
@@ -158,22 +158,22 @@ TEST_P(BtsTimingTests, SSE) {
 
 	auto start_gpu = std::chrono::high_resolution_clock::now();
 	for (int i = 0; i < N; i++) {
-		cudaDeviceSynchronize();
+		hipDeviceSynchronize();
 		FIDESlib::CKKS::Ciphertext GPUct2(GPUcc_);
-		cudaDeviceSynchronize();
+		hipDeviceSynchronize();
 		GPUct2.copy(GPUct1);
-		cudaDeviceSynchronize();
+		hipDeviceSynchronize();
 		Bootstrap(GPUct2, numSlots, false);
-		cudaDeviceSynchronize();
+		hipDeviceSynchronize();
 		GPUct1.copy(GPUct2);
-		cudaDeviceSynchronize();
+		hipDeviceSynchronize();
 	}
 	auto end_gpu = std::chrono::high_resolution_clock::now();
 	std::cout << "took: " << (std::chrono::duration_cast<std::chrono::milliseconds>(end_gpu - start_gpu).count()) / N << " ms." << std::endl;
 
 	std::cout << GPUct1.getLevel() << std::endl;
 
-	cudaDeviceSynchronize();
+	hipDeviceSynchronize();
 
 	FIDESlib::CKKS::RawCipherText raw_res;
 	GPUct1.store(raw_res);
@@ -246,7 +246,7 @@ TEST_P(BtsTimingTests, REGULAR2) {
 	auto start_gpu = std::chrono::high_resolution_clock::now();
 	for (int i = 0; i < N; i++) {
 		Bootstrap(GPUct1, numSlots, false);
-		cudaDeviceSynchronize();
+		hipDeviceSynchronize();
 	}
 	auto end_gpu = std::chrono::high_resolution_clock::now();
 	std::cout << "took: " << (std::chrono::duration_cast<std::chrono::milliseconds>(end_gpu - start_gpu).count()) / N << " ms." << std::endl;
@@ -324,14 +324,14 @@ TEST_P(BtsTimingTests, SPARSE) {
 	auto start_gpu = std::chrono::high_resolution_clock::now();
 	for (int i = 0; i < N; i++) {
 		Bootstrap(GPUct1, numSlots, false);
-		cudaDeviceSynchronize();
+		hipDeviceSynchronize();
 	}
 	auto end_gpu = std::chrono::high_resolution_clock::now();
 	std::cout << "took: " << (std::chrono::duration_cast<std::chrono::milliseconds>(end_gpu - start_gpu).count()) / N << " ms." << std::endl;
 
 	std::cout << GPUct1.getLevel() << std::endl;
 
-	cudaDeviceSynchronize();
+	hipDeviceSynchronize();
 
 	FIDESlib::CKKS::RawCipherText raw_res;
 	GPUct1.store(raw_res);

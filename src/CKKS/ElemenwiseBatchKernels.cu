@@ -1,3 +1,4 @@
+#include "hip/hip_runtime.h"
 //
 // Created by carlosad on 27/09/24.
 //
@@ -6,7 +7,7 @@
 #include "CKKS/Rescale.cuh"
 #include "Rotation.cuh"
 
-#include <cooperative_groups.h>
+#include <hip/hip_cooperative_groups.h>
 #include <cuda/barrier>
 namespace cg = cooperative_groups;
 

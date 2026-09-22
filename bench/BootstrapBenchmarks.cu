@@ -1,3 +1,4 @@
+#include "hip/hip_runtime.h"
 //
 // Created by carlosad on 19/11/24.
 //
@@ -18,7 +19,7 @@ BENCHMARK_DEFINE_F(GeneralFixture, ApproxModReduction)(benchmark::State& state) 
 	}
 
 	int devcount = -1;
-	cudaGetDeviceCount(&devcount);
+	hipGetDeviceCount(&devcount);
 
 	std::vector<int> GPUs = generalTestParams.GPUs;
 
@@ -78,7 +79,7 @@ BENCHMARK_DEFINE_F(GeneralFixture, ApproxModReductionSparse)(benchmark::State& s
 	}
 
 	int devcount = -1;
-	cudaGetDeviceCount(&devcount);
+	hipGetDeviceCount(&devcount);
 
 	std::vector<int> GPUs = generalTestParams.GPUs;
 
@@ -125,7 +126,7 @@ BENCHMARK_DEFINE_F(GeneralFixture, ApproxModReductionSparse)(benchmark::State& s
 
 BENCHMARK_DEFINE_F(GeneralFixture, CoeffsToSlots)(benchmark::State& state) {
 	int devcount = -1;
-	cudaGetDeviceCount(&devcount);
+	hipGetDeviceCount(&devcount);
 
 	std::vector<int> GPUs = generalTestParams.GPUs;
 
@@ -181,7 +182,7 @@ BENCHMARK_DEFINE_F(GeneralFixture, CoeffsToSlots)(benchmark::State& state) {
 
 BENCHMARK_DEFINE_F(GeneralFixture, SlotsToCoeffs)(benchmark::State& state) {
 	int devcount = -1;
-	cudaGetDeviceCount(&devcount);
+	hipGetDeviceCount(&devcount);
 
 	std::vector<int> GPUs = generalTestParams.GPUs;
 
@@ -303,7 +304,7 @@ BENCHMARK_DEFINE_F(GeneralFixture, HyperParamBootstrapGPU)(benchmark::State& sta
 	fideslibParams.batch				= state.range(2);
 	const int slots						= conf[state.range(3)].slots;
 	FIDESlib::CKKS::RawParams raw_param = FIDESlib::CKKS::GetRawParams(cc, UNIFORM);
-	cudaSetDevice(GPUs[0]);
+	hipSetDevice(GPUs[0]);
 	CudaCheckErrorMod;
 	FIDESlib::CKKS::Context GPUcc = FIDESlib::CKKS::GenCryptoContextGPU(fideslibParams.adaptTo(raw_param), GPUs);
 
@@ -370,7 +371,7 @@ BENCHMARK_DEFINE_F(GeneralFixture, PrintRotationsBootstrapGPU)(benchmark::State&
 	fideslibParams.batch				= state.range(2);
 	const int slots						= conf[state.range(3)].slots;
 	FIDESlib::CKKS::RawParams raw_param = FIDESlib::CKKS::GetRawParams(cc, UNIFORM);
-	cudaSetDevice(GPUs[0]);
+	hipSetDevice(GPUs[0]);
 	CudaCheckErrorMod;
 	FIDESlib::CKKS::Context GPUcc = FIDESlib::CKKS::GenCryptoContextGPU(fideslibParams.adaptTo(raw_param), GPUs);
 
@@ -422,7 +423,7 @@ BENCHMARK_DEFINE_F(GeneralFixture, BootstrapGPU)(benchmark::State& state) {
 	fideslibParams.batch				= state.range(2);
 	const int slots						= conf[state.range(3)].slots;
 	FIDESlib::CKKS::RawParams raw_param = FIDESlib::CKKS::GetRawParams(cc, UNIFORM);
-	cudaSetDevice(GPUs[0]);
+	hipSetDevice(GPUs[0]);
 	CudaCheckErrorMod;
 	FIDESlib::CKKS::Context GPUcc = FIDESlib::CKKS::GenCryptoContextGPU(fideslibParams.adaptTo(raw_param), GPUs);
 
@@ -468,7 +469,7 @@ BENCHMARK_DEFINE_F(GeneralFixture, BootstrapGPU)(benchmark::State& state) {
 	int endlevel = 0;
 
 	for (auto _ : state) {
-		cudaDeviceSynchronize();
+		hipDeviceSynchronize();
 		auto start = std::chrono::high_resolution_clock::now();
 		FIDESlib::CKKS::Bootstrap(GPUct1, slots, false);
 		auto cpu_end = std::chrono::high_resolution_clock::now();
@@ -543,7 +544,7 @@ BENCHMARK_DEFINE_F(GeneralFixture, SSEBootstrapGPU)(benchmark::State& state) {
 	fideslibParams.batch				= state.range(2);
 	const int slots						= conf[state.range(3)].slots;
 	FIDESlib::CKKS::RawParams raw_param = FIDESlib::CKKS::GetRawParams(cc, ENCAPS);
-	cudaSetDevice(GPUs[0]);
+	hipSetDevice(GPUs[0]);
 	CudaCheckErrorMod;
 	FIDESlib::CKKS::Context GPUcc = FIDESlib::CKKS::GenCryptoContextGPU(fideslibParams.adaptTo(raw_param), GPUs);
 
@@ -589,7 +590,7 @@ BENCHMARK_DEFINE_F(GeneralFixture, SSEBootstrapGPU)(benchmark::State& state) {
 	int endlevel = 0;
 
 	for (auto _ : state) {
-		cudaDeviceSynchronize();
+		hipDeviceSynchronize();
 		auto start = std::chrono::high_resolution_clock::now();
 		FIDESlib::CKKS::Bootstrap(GPUct1, slots, false);
 		auto end_cpu = std::chrono::high_resolution_clock::now();
@@ -646,7 +647,7 @@ BENCHMARK_REGISTER_F(GeneralFixture, SSEBootstrapGPU)->ArgsProduct({ { 20 }, { 0
 BENCHMARK_DEFINE_F(GeneralFixture, BootstrapCPU)(benchmark::State& state) {
 
 	int devcount = -1;
-	cudaGetDeviceCount(&devcount);
+	hipGetDeviceCount(&devcount);
 
 	std::vector<int> GPUs = generalTestParams.GPUs;
 

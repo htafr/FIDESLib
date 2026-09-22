@@ -88,7 +88,7 @@ TEST_P(MMTests, MatrixMultiplication) {
 	struct MatrixMatrixProductPrecomputations_GPU precomp_gpu =
 	  getMatrixMatrixProductPrecomputations_GPU(cc_, cc, blockSize, bStep, matmul_level, matmul_level - 4, false, numSlots);
 	TransposePrecomputations_GPU Tprecomp_gpu = getMatrixTransposePrecomputations_GPU(cc_, cc, blockSize, bStep, matmul_level - 3);
-	cudaDeviceSynchronize();
+	hipDeviceSynchronize();
 	auto end_gpu = std::chrono::high_resolution_clock::now();
 	std::cout << "took: " << (std::chrono::duration_cast<std::chrono::milliseconds>(end_gpu - start_gpu).count()) << " ms." << std::endl;
 
@@ -105,7 +105,7 @@ TEST_P(MMTests, MatrixMultiplication) {
 		PCMM_GPU(tokens_gpu, weights_layer0.Wq, blockSize, Q, precomp_gpu, weights_layer0.bq);
 		CudaCheckErrorMod;
 	}
-	cudaDeviceSynchronize();
+	hipDeviceSynchronize();
 	end_gpu = std::chrono::high_resolution_clock::now();
 	std::cout << "took: " << (std::chrono::duration_cast<std::chrono::milliseconds>(end_gpu - start_gpu).count()) / N << " ms." << std::endl;
 

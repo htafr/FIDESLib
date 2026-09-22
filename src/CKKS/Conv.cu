@@ -1,3 +1,4 @@
+#include "hip/hip_runtime.h"
 //
 // Created by carlosad on 4/04/24.
 //
@@ -5,9 +6,9 @@
 #include "CKKS/Conv.cuh"
 #include "ModMult.cuh"
 
-#include <cooperative_groups.h>
+#include <hip/hip_cooperative_groups.h>
 #include <cuda/pipeline>
-#include <cuda_runtime.h>
+#include <hip/hip_runtime.h>
 
 namespace FIDESlib::CKKS {
 

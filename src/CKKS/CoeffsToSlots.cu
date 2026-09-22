@@ -1,3 +1,4 @@
+#include "hip/hip_runtime.h"
 //
 // Created by carlosad on 27/11/24.
 //
@@ -77,16 +78,16 @@ void FIDESlib::CKKS::EvalLinearTransform(Ciphertext& ctxt, int slots, bool decod
 		}
 
 		if constexpr (PRINT) {
-			cudaDeviceSynchronize();
+			hipDeviceSynchronize();
 			std::cout << "Input LT ";
 			for (auto& j : ctxt.c0.GPU) {
-				cudaSetDevice(j.device);
+				hipSetDevice(j.device);
 				for (auto& i : j.limb) {
 					SWITCH(i, printThisLimb(1));
 				}
 			}
 			std::cout << std::endl;
-			cudaDeviceSynchronize();
+			hipDeviceSynchronize();
 		}
 
 		bool ext = true;
@@ -99,49 +100,49 @@ void FIDESlib::CKKS::EvalLinearTransform(Ciphertext& ctxt, int slots, bool decod
 		}
 
 		if constexpr (PRINT) {
-			cudaDeviceSynchronize();
+			hipDeviceSynchronize();
 			for (int i = 0; i < bStep; ++i) {
 				std::cout << "In hoistRotation ";
 				for (auto& j : fastRotation[i].c0.GPU) {
-					cudaSetDevice(j.device);
+					hipSetDevice(j.device);
 					for (auto& k : j.limb) {
 						SWITCH(k, printThisLimb(1));
 					}
 				}
 				std::cout << std::endl;
 				for (auto& j : fastRotation[i].c0.GPU) {
-					cudaSetDevice(j.device);
+					hipSetDevice(j.device);
 					for (auto& k : j.SPECIALlimb) {
 						SWITCH(k, printThisLimb(1));
 					}
 				}
 				std::cout << std::endl;
 			}
-			cudaDeviceSynchronize();
+			hipDeviceSynchronize();
 		}
 
 		ctxt.rotate_hoisted(indexes, fastRotationPtr, ext);
 
 		if constexpr (PRINT) {
-			cudaDeviceSynchronize();
+			hipDeviceSynchronize();
 			for (int i = 0; i < bStep; ++i) {
 				std::cout << "Out hoistRotation ";
 				for (auto& j : fastRotation[i].c0.GPU) {
-					cudaSetDevice(j.device);
+					hipSetDevice(j.device);
 					for (auto& k : j.limb) {
 						SWITCH(k, printThisLimb(1));
 					}
 				}
 				std::cout << std::endl;
 				for (auto& j : fastRotation[i].c0.GPU) {
-					cudaSetDevice(j.device);
+					hipSetDevice(j.device);
 					for (auto& k : j.SPECIALlimb) {
 						SWITCH(k, printThisLimb(1));
 					}
 				}
 				std::cout << std::endl;
 			}
-			cudaDeviceSynchronize();
+			hipDeviceSynchronize();
 		}
 		Ciphertext inner(cc_);
 		std::vector<Plaintext>& A = decode ? cc.GetBootPrecomputation(slots).LT.invA : cc.GetBootPrecomputation(slots).LT.A;
@@ -164,16 +165,16 @@ void FIDESlib::CKKS::EvalCoeffsToSlots(Ciphertext& ctxt, int slots, bool decode)
 	ContextData& cc = ctxt.cc;
 
 	if constexpr (PRINT) {
-		cudaDeviceSynchronize();
+		hipDeviceSynchronize();
 		std::cout << "Input stc ";
 		for (auto& j : ctxt.c0.GPU) {
-			cudaSetDevice(j.device);
+			hipSetDevice(j.device);
 			for (auto& i : j.limb) {
 				SWITCH(i, printThisLimb(1));
 			}
 		}
 		std::cout << std::endl;
-		cudaDeviceSynchronize();
+		hipDeviceSynchronize();
 	}
 	//  No need for Encrypted Bit Reverse
 	// Ciphertext& result = ctxt;

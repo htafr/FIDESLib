@@ -31,7 +31,7 @@ void KeySwitchingKey::Initialize(RawKeySwitchKey& rkk) {
 	a.loadDecompDigit(rkk.r_key[0], rkk.r_key_moduli[0]);
 	b.loadDecompDigit(rkk.r_key[1], rkk.r_key_moduli[1]);
 
-	cudaDeviceSynchronize();
+	hipDeviceSynchronize();
 }
 
 KeySwitchingKey::KeySwitchingKey(Context& cc)

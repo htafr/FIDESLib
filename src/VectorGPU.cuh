@@ -6,9 +6,9 @@
 #define FIDESLIB_VECTORGPU_CUH
 #include "CudaUtils.cuh"
 #include "LogUtil.hpp"
-#include "cuda.h"
+#include "hip/hip_runtime.h"
 #include <cassert>
-#include <driver_types.h>
+#include <hip/driver_types.h>
 #include <type_traits>
 #include <vector>
 

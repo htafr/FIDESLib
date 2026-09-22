@@ -1,3 +1,4 @@
+#include "hip/hip_runtime.h"
 //
 // Created by seyda on 9/14/24.
 //

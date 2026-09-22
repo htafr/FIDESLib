@@ -11,7 +11,7 @@ namespace FIDESlib::Benchmarks {
 
 BENCHMARK_DEFINE_F(FIDESlibFixture, RNSPolyRescale)(benchmark::State& state) {
 	int devcount = -1;
-	cudaGetDeviceCount(&devcount);
+	hipGetDeviceCount(&devcount);
 
 	std::vector<int> GPUs;
 	for (int i = 0; i < devcount; ++i)
@@ -42,7 +42,7 @@ BENCHMARK_DEFINE_F(FIDESlibFixture, RNSPolyRescale)(benchmark::State& state) {
 
 BENCHMARK_DEFINE_F(FIDESlibFixture, RNSPolyRescaleContextLimbCount)(benchmark::State& state) {
 	int devcount = -1;
-	cudaGetDeviceCount(&devcount);
+	hipGetDeviceCount(&devcount);
 
 	std::vector<int> GPUs;
 	for (int i = 0; i < devcount; ++i)

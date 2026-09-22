@@ -1,3 +1,4 @@
+#include "hip/hip_runtime.h"
 //
 // Created by carlosad on 2/05/24.
 //
@@ -84,11 +85,11 @@ ContextData::ContextData(const Parameters& param_, const std::vector<int>& devs,
 			bits += i.bits;
 
 	for (int dev : GPUid) {
-		cudaSetDevice(dev);
-		cudaMemPool_t mp;
-		cudaDeviceGetDefaultMemPool(&mp, dev);
+		hipSetDevice(dev);
+		hipMemPool_t mp;
+		hipDeviceGetDefaultMemPool(&mp, dev);
 		uint64_t threshold = UINT64_MAX; // 5l * 1024l * 1024l * 1024l;  // One Gigabyte of memory
-		cudaMemPoolSetAttribute(mp, cudaMemPoolAttrReleaseThreshold, &threshold);
+		hipMemPoolSetAttribute(mp, hipMemPoolAttrReleaseThreshold, &threshold);
 		CudaCheckErrorModNoSync;
 	}
 
@@ -114,7 +115,7 @@ std::vector<std::vector<std::vector<LimbRecord>>> ContextData::generateDigitMeta
 	std::vector<std::vector<std::vector<LimbRecord>>> digitMeta(meta.size());
 
 	for (size_t i = 0; i < digitGPUid.size(); ++i) {
-		cudaSetDevice(GPUid[i]);
+		hipSetDevice(GPUid[i]);
 		for (int d : digitGPUid.at(i)) {
 			digitMeta[i].emplace_back();
 
@@ -152,7 +153,7 @@ ContextData::generateDecompMeta(const std::vector<std::vector<LimbRecord>>& meta
 	std::vector<std::vector<std::vector<LimbRecord>>> decompMeta(meta.size());
 
 	for (size_t i = 0; i < digitGPUid.size(); ++i) {
-		cudaSetDevice(GPUid[i]);
+		hipSetDevice(GPUid[i]);
 		for (int d : digitGPUid.at(i)) {
 			decompMeta[i].emplace_back();
 
@@ -233,7 +234,7 @@ ContextData::generateMeta(const std::vector<int>& GPUid, const int dnum, const s
 			}
 		}*/
 
-			cudaSetDevice(GPUid[dev]);
+			hipSetDevice(GPUid[dev]);
 
 			meta[dev].push_back(LimbRecord{ .id = i, .type = (prime[i].type ? *(prime[i].type) : (prime[i].bits <= 30 ? U32 : U64)), .digit = digit_ });
 			meta[dev].back().stream.init();
@@ -252,7 +253,7 @@ ContextData::generateMeta(const std::vector<int>& GPUid, const int dnum, const s
 						dev = j;
 			}
 		}*/
-			cudaSetDevice(GPUid[dev]);
+			hipSetDevice(GPUid[dev]);
 
 			meta[dev].push_back(LimbRecord{ .id = i, .type = (prime[i].type ? *(prime[i].type) : (prime[i].bits <= 30 ? U32 : U64)), .digit = digit_ });
 			meta[dev].back().stream.init();
@@ -295,7 +296,7 @@ ContextData::generateSpecialMeta(const std::vector<std::vector<LimbRecord>>& met
 
 	for (size_t d = 0; d < GPUid.size(); ++d) {
 		specialMeta.at(d).resize(specialPrime.size());
-		cudaSetDevice(GPUid[d]);
+		hipSetDevice(GPUid[d]);
 		for (int i = 0; i < (int)specialPrime.size(); ++i) {
 			specialMeta.at(d).at(i).id	 = ID0 + i;
 			specialMeta.at(d).at(i).type = (specialPrime[i].type ? *(specialPrime[i].type) : (specialPrime[i].bits <= 30 ? U32 : U64));
@@ -661,19 +662,19 @@ void ContextData::PrepareNCCLCommunication() {
 
 		bool p2p = true;
 		for (auto& i : ids) {
-			cudaSetDevice(i);
+			hipSetDevice(i);
 			for (auto& j : ids) {
 				if (i != j) {
 					int canAccessPeer;
-					cudaDeviceCanAccessPeer(&canAccessPeer, i, j);
+					hipDeviceCanAccessPeer(&canAccessPeer, i, j);
 					if (canAccessPeer)
-						cudaDeviceEnablePeerAccess(j, 0);
+						hipDeviceEnablePeerAccess(j, 0);
 					else
 						p2p = false;
 
-					cudaDeviceCanAccessPeer(&canAccessPeer, j, i);
+					hipDeviceCanAccessPeer(&canAccessPeer, j, i);
 					if (canAccessPeer)
-						cudaDeviceEnablePeerAccess(j, 0);
+						hipDeviceEnablePeerAccess(j, 0);
 					else
 						p2p = false;
 				}
@@ -694,7 +695,7 @@ void ContextData::PrepareNCCLCommunication() {
 		GPUrank.resize(GPUid.size());
 		ncclGroupStart();
 		for (uint32_t i = 0; i < GPUid.size(); i++) {
-			cudaSetDevice(GPUid[i]);
+			hipSetDevice(GPUid[i]);
 			if (precom.dev_to_communicator[GPUid[i]] == nullptr) {
 				NCCLCHECK(ncclCommInitRank(GPUrank.data() + i, num_ranks, communicatorID, i));
 				precom.dev_to_communicator[GPUid[i]] = GPUrank.data() + i;
@@ -704,7 +705,7 @@ void ContextData::PrepareNCCLCommunication() {
 		}
 		ncclGroupEnd();
 #endif
-		cudaDeviceSynchronize();
+		hipDeviceSynchronize();
 	}
 
 	top_limb_stream.resize(2 * GPUid.size());
@@ -715,7 +716,7 @@ void ContextData::PrepareNCCLCommunication() {
 	top_limb_buffer2_handle.resize(2 * GPUid.size());
 	for (size_t i = 0; i < 2 * GPUid.size(); ++i) {
 		int g = i % GPUid.size();
-		cudaSetDevice(GPUid[g]);
+		hipSetDevice(GPUid[g]);
 
 		top_limb_stream[g].init(100);
 		top_limb_stream2[g].init(100);
@@ -727,12 +728,12 @@ void ContextData::PrepareNCCLCommunication() {
 			NCCLCHECK(ncclMemAlloc((void**)&top_limb_buffer2[i], sizeof(uint64_t) * N));
 			NCCLCHECK(ncclCommRegister(GPUrank[g], top_limb_buffer2[i], sizeof(uint64_t) * N, &top_limb_buffer2_handle[i]));
 #else
-			cudaMalloc((void**)&top_limb_buffer[i], sizeof(uint64_t) * N);
-			cudaMalloc((void**)&top_limb_buffer2[i], sizeof(uint64_t) * N);
+			hipMalloc((void**)&top_limb_buffer[i], sizeof(uint64_t) * N);
+			hipMalloc((void**)&top_limb_buffer2[i], sizeof(uint64_t) * N);
 #endif
 		} else {
-			cudaMalloc((void**)&top_limb_buffer[i], sizeof(uint64_t) * N);
-			cudaMalloc((void**)&top_limb_buffer2[i], sizeof(uint64_t) * N);
+			hipMalloc((void**)&top_limb_buffer[i], sizeof(uint64_t) * N);
+			hipMalloc((void**)&top_limb_buffer2[i], sizeof(uint64_t) * N);
 		}
 		// cudaDeviceSynchronize();
 		top_limbptr.emplace_back(top_limb_stream[g], 1, GPUid[g], (void**)&top_limb_buffer[i]);
@@ -742,7 +743,7 @@ void ContextData::PrepareNCCLCommunication() {
 		for (size_t i = 0; i < GPUid.size(); ++i) {
 			gatherStream[i].resize(GPUid.size());
 			for (size_t j = 0; j < GPUid.size(); ++j) {
-				cudaSetDevice(GPUid[j]);
+				hipSetDevice(GPUid[j]);
 				gatherStream[i][j].init(100);
 			}
 		}
@@ -761,7 +762,7 @@ void ContextData::PrepareNCCLCommunication() {
 		digitStream[i].resize(GPUid.size());
 		digitStreamForMemcpyPeer[i].resize(GPUid.size());
 		for (size_t j = 0; j < GPUid.size(); ++j) {
-			cudaSetDevice(GPUid[j]);
+			hipSetDevice(GPUid[j]);
 			digitStream[i][j].init(100);
 			digitStreamForMemcpyPeer[i][j].resize(GPUid.size());
 			for (size_t k = 0; k < GPUid.size(); ++k) {
@@ -774,7 +775,7 @@ void ContextData::PrepareNCCLCommunication() {
 	for (int i = 0; i < dnum; ++i) {
 		digitStream2[i].resize(GPUid.size());
 		for (size_t j = 0; j < GPUid.size(); ++j) {
-			cudaSetDevice(GPUid[j]);
+			hipSetDevice(GPUid[j]);
 			digitStream2[i][j].init();
 		}
 	}
@@ -795,7 +796,7 @@ std::vector<std::vector<LimbRecord>> ContextData::generateSplitSpecialMeta(std::
 
 	int init = 0;
 	for (uint32_t i = 0; i < GPUid.size(); ++i) {
-		cudaSetDevice(GPUid[i]);
+		hipSetDevice(GPUid[i]);
 		int num = (specialMeta.size() - init) / (GPUid.size() - i);
 		for (int j = init; j < init + num; ++j) {
 			res[i].emplace_back(LimbRecord{ .id = specialMeta[j].id, .type = specialMeta[j].type, .digit = specialMeta[j].digit });
@@ -808,7 +809,7 @@ std::vector<std::vector<LimbRecord>> ContextData::generateSplitSpecialMeta(std::
 
 ContextData::~ContextData() {
 	for (uint32_t i = 0; i < GPUid.size(); ++i) {
-		cudaSetDevice(GPUid[i]);
+		hipSetDevice(GPUid[i]);
 		CudaCheckErrorMod;
 	}
 	key_switch_aux.reset(nullptr);
@@ -827,7 +828,7 @@ ContextData::~ContextData() {
 	//   CudaCheckErrorMod;
 	for (size_t i = 0; i < top_limbptr.size(); ++i) {
 		int g = i % GPUid.size();
-		cudaSetDevice(GPUid[g]);
+		hipSetDevice(GPUid[g]);
 		if (GPUid.size() > 1) {
 #ifdef NCCL
 			if (top_limb_buffer_handle[i])
@@ -838,12 +839,12 @@ ContextData::~ContextData() {
 			NCCLCHECK(ncclMemFree(top_limb_buffer2[i]));
 #else
 
-			cudaFree(top_limb_buffer[i]);
-			cudaFree(top_limb_buffer2[i]);
+			hipFree(top_limb_buffer[i]);
+			hipFree(top_limb_buffer2[i]);
 #endif
 		} else {
-			cudaFree(top_limb_buffer[i]);
-			cudaFree(top_limb_buffer2[i]);
+			hipFree(top_limb_buffer[i]);
+			hipFree(top_limb_buffer2[i]);
 		}
 		top_limbptr[i].free(top_limb_stream[g]);
 		top_limbptr2[i].free(top_limb_stream2[g]);
@@ -855,7 +856,7 @@ ContextData::~ContextData() {
 	NCCLCHECK(ncclGroupStart());
 	for (auto rank : precom.dev_to_communicator) {
 		if (rank.second) {
-			cudaSetDevice(rank.first);
+			hipSetDevice(rank.first);
 			NCCLCHECK(ncclCommFinalize(*rank.second));
 			// CudaCheckErrorMod;
 			NCCLCHECK(ncclCommDestroy(*rank.second));
@@ -998,9 +999,9 @@ void SetCurrentContext(Context& cc) {
 
 			parallel_for(0, cur->GPUid.size(), 1, [&](int i) {
 				// for (size_t i = 0; i < cur->GPUid.size(); ++i) {
-				cudaSetDevice(cur->GPUid[i]);
+				hipSetDevice(cur->GPUid[i]);
 				// cudaDeviceSynchronize();
-				cudaMemcpyToSymbolAsync(FIDESlib::constants, &(cur->precom.constants[i]), sizeof(FIDESlib::Constants), 0, cudaMemcpyHostToDevice, 0);
+				hipMemcpyToSymbolAsync(HIP_SYMBOL(FIDESlib::constants), &(cur->precom.constants[i]), sizeof(FIDESlib::Constants), 0, hipMemcpyHostToDevice, 0);
 				// cudaDeviceSynchronize();
 			});
 		}

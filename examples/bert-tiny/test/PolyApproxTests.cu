@@ -1,3 +1,4 @@
+#include "hip/hip_runtime.h"
 //
 // Created by seyda on 5/8/25.
 //
@@ -84,7 +85,7 @@ TEST_P(PolyApproxTests, PolynomialApproximation) {
 
 	EvalSoftmax_Matrix(
 	  QKT_SM, ct_sm[0][0], keys.secretKey, masks.mask_tokens[token_length], masks.mask_broadcast, masks.mask_layernorm[0], masks.mask_max, numSlots, blockSize, bStepAcc, token_length, bts);
-	cudaDeviceSynchronize();
+	hipDeviceSynchronize();
 	std::cout << "# limbs: " << QKT_SM[0][0].getLevel() << " " << QKT_SM[0][0].NoiseLevel << std::endl;
 	printMatrix(decryptGPUMatrix(QKT_SM, keys.secretKey, ct_sm, numSlots, blockSize), 2, 2, "Output: ", false);
 

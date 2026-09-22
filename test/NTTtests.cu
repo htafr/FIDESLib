@@ -1,3 +1,4 @@
+#include "hip/hip_runtime.h"
 //
 // Created by carlosad on 25/03/24.
 //
@@ -44,7 +45,7 @@ TEST_P(NTTTest, TestCpuNTT) {
 
 TEST_P(FailNTTTest, TestConstantsSmall) {
 	int devcount = -1;
-	cudaGetDeviceCount(&devcount);
+	hipGetDeviceCount(&devcount);
 
 	std::vector<int> GPUs = devices;
 
@@ -109,7 +110,7 @@ TEST_P(FailNTTTest, TestConstantsSmall) {
 TEST_P(NTTTest, TestConstants) {
 
 	int devcount = -1;
-	cudaGetDeviceCount(&devcount);
+	hipGetDeviceCount(&devcount);
 
 	std::vector<int> GPUs = devices;
 
@@ -191,7 +192,7 @@ TEST_P(NTTTest, TestConstants) {
 
 TEST_P(NTTTest32, TestConstants32) {
 	int devcount = -1;
-	cudaGetDeviceCount(&devcount);
+	hipGetDeviceCount(&devcount);
 
 	std::vector<int> GPUs = devices;
 
@@ -268,7 +269,7 @@ TEST_P(NTTTest32, TestConstants32) {
 
 TEST_P(FailNTTTest, TestLimbNTT_1D_small) {
 	int devcount = -1;
-	cudaGetDeviceCount(&devcount);
+	hipGetDeviceCount(&devcount);
 
 	std::vector<int> GPUs;
 	for (int i = 0; i < devcount; ++i)
@@ -285,7 +286,7 @@ TEST_P(FailNTTTest, TestLimbNTT_1D_small) {
 	CudaCheckErrorMod;
 
 	for (int l : { 0 }) {
-		cudaSetDevice(GPUs[0]);
+		hipSetDevice(GPUs[0]);
 		FIDESlib::Stream s;
 		s.init();
 
@@ -312,7 +313,7 @@ TEST_P(FailNTTTest, TestLimbNTT_1D_small) {
 
 		std::vector<uint64_t> res_gpu;
 		limb2.store(res_gpu);
-		cudaDeviceSynchronize();
+		hipDeviceSynchronize();
 		res_gpu.resize(blockDim.x * 2);
 		// END GPU SETUP
 
@@ -339,10 +340,10 @@ TEST_P(FailNTTTest, TestLimbNTT_1D_small) {
 
 		FIDESlib::INTT_1D<uint64_t><<<gridDim, blockDim, bytes, limb2.stream.ptr()>>>(
 		  limb2.getGlobals(), v.data, nullptr, 2 * blockDim.x, primeid, FIDESlib::modinv(N, hC_.primes[primeid]), 3);
-		cudaDeviceSynchronize();
+		hipDeviceSynchronize();
 
 		limb2.store(res_gpu);
-		cudaDeviceSynchronize();
+		hipDeviceSynchronize();
 		res_gpu.resize(blockDim.x * 2);
 
 		ASSERT_EQ(v2_small, res_gpu);
@@ -353,7 +354,7 @@ TEST_P(FailNTTTest, TestLimbNTT_1D_small) {
 
 TEST_P(NTTTest, TestLimbNTT_1D) {
 	int devcount = -1;
-	cudaGetDeviceCount(&devcount);
+	hipGetDeviceCount(&devcount);
 
 	std::vector<int> GPUs;
 	for (int i = 0; i < devcount; ++i)
@@ -367,7 +368,7 @@ TEST_P(NTTTest, TestLimbNTT_1D) {
 	CudaCheckErrorMod;
 
 	for (int l : { 0 }) {
-		cudaSetDevice(GPUs[0]);
+		hipSetDevice(GPUs[0]);
 		FIDESlib::Stream s;
 		s.init();
 
@@ -394,7 +395,7 @@ TEST_P(NTTTest, TestLimbNTT_1D) {
 
 		std::vector<uint64_t> res_gpu;
 		limb2.store(res_gpu);
-		cudaDeviceSynchronize();
+		hipDeviceSynchronize();
 		res_gpu.resize(blockDim.x * 2);
 		// END GPU SETUP
 
@@ -441,7 +442,7 @@ TEST_P(NTTTest, TestLimbNTT_1D) {
 
 TEST_P(NTTTest, TestLimbBitReverse) {
 	int devcount = -1;
-	cudaGetDeviceCount(&devcount);
+	hipGetDeviceCount(&devcount);
 
 	std::vector<int> GPUs;
 	for (int i = 0; i < devcount; ++i)
@@ -455,7 +456,7 @@ TEST_P(NTTTest, TestLimbBitReverse) {
 	CudaCheckErrorMod;
 
 	for (int l : { 0 }) {
-		cudaSetDevice(GPUs[0]);
+		hipSetDevice(GPUs[0]);
 		FIDESlib::Stream s;
 		s.init();
 
@@ -470,7 +471,7 @@ TEST_P(NTTTest, TestLimbBitReverse) {
 
 		std::vector<uint64_t> res_gpu;
 		limb2.store(res_gpu);
-		cudaDeviceSynchronize();
+		hipDeviceSynchronize();
 		FIDESlib::bit_reverse_vector(v2);
 		ASSERT_EQ(v2, res_gpu);
 
@@ -483,7 +484,7 @@ TEST_P(NTTTest, TestLimbBitReverse) {
 
 		std::vector<uint64_t> res_gpu2;
 		limb2.store(res_gpu2);
-		cudaDeviceSynchronize();
+		hipDeviceSynchronize();
 		FIDESlib::bit_reverse_vector(v2);
 		ASSERT_EQ(v2, res_gpu2);
 
@@ -494,7 +495,7 @@ TEST_P(NTTTest, TestLimbBitReverse) {
 
 TEST_P(NTTTest, TestLimbNTTSecondHalf) {
 	int devcount = -1;
-	cudaGetDeviceCount(&devcount);
+	hipGetDeviceCount(&devcount);
 
 	std::vector<int> GPUs;
 	for (int i = 0; i < devcount; ++i)
@@ -508,7 +509,7 @@ TEST_P(NTTTest, TestLimbNTTSecondHalf) {
 	CudaCheckErrorMod;
 
 	for (int l : { 0 }) {
-		cudaSetDevice(GPUs[0]);
+		hipSetDevice(GPUs[0]);
 		FIDESlib::Stream s;
 		s.init();
 
@@ -540,7 +541,7 @@ TEST_P(NTTTest, TestLimbNTTSecondHalf) {
 		limb2.load(aux);
 		aux.free(limb2.stream);
 		limb2.store(res_gpu);
-		cudaDeviceSynchronize();
+		hipDeviceSynchronize();
 
 		std::vector<uint64_t> res_cpu(v2);
 		for (size_t i = 0; i < blockDim.x * 2; ++i) {
@@ -573,7 +574,7 @@ TEST_P(NTTTest, TestLimbNTTSecondHalf) {
 
 TEST_P(FailNTTTest32, TestLimbNTTSecondHalf32) {
 	int devcount = -1;
-	cudaGetDeviceCount(&devcount);
+	hipGetDeviceCount(&devcount);
 
 	std::vector<int> GPUs;
 	for (int i = 0; i < devcount; ++i)
@@ -587,7 +588,7 @@ TEST_P(FailNTTTest32, TestLimbNTTSecondHalf32) {
 	CudaCheckErrorMod;
 
 	for (int l : { 0 }) {
-		cudaSetDevice(GPUs[0]);
+		hipSetDevice(GPUs[0]);
 		FIDESlib::Stream s;
 		s.init();
 
@@ -617,7 +618,7 @@ TEST_P(FailNTTTest32, TestLimbNTTSecondHalf32) {
 		limb2.load(aux);
 		aux.free(limb2.stream);
 		limb2.store(res_gpu);
-		cudaDeviceSynchronize();
+		hipDeviceSynchronize();
 
 		std::vector<uint64_t> res_cpu(v2);
 		for (size_t i = 0; i < blockDim.x * 2; ++i) {
@@ -657,7 +658,7 @@ TEST_P(FailNTTTest32, TestLimbNTTSecondHalf32) {
 
 TEST_P(FailNTTTest, TestLimbINTTSecondHalfSmall) {
 	int devcount = -1;
-	cudaGetDeviceCount(&devcount);
+	hipGetDeviceCount(&devcount);
 
 	std::vector<int> GPUs;
 	for (int i = 0; i < devcount; ++i)
@@ -673,7 +674,7 @@ TEST_P(FailNTTTest, TestLimbINTTSecondHalfSmall) {
 	CudaCheckErrorMod;
 
 	for (int l : { 0 }) {
-		cudaSetDevice(GPUs[0]);
+		hipSetDevice(GPUs[0]);
 		FIDESlib::Stream s;
 		s.init();
 
@@ -701,12 +702,12 @@ TEST_P(FailNTTTest, TestLimbINTTSecondHalfSmall) {
 		FIDESlib::INTT_<uint64_t, false, algo><<<gridDim, blockDim, bytes, limb2.stream.ptr()>>>(limb2.getGlobals(), v.data, primeid, aux.data);
 
 		std::vector<uint64_t> res_gpu;
-		cudaDeviceSynchronize();
+		hipDeviceSynchronize();
 		limb2.load(aux);
-		cudaDeviceSynchronize();
+		hipDeviceSynchronize();
 		aux.free(limb2.stream);
 		limb2.store(res_gpu);
-		cudaDeviceSynchronize();
+		hipDeviceSynchronize();
 		// res_gpu.resize(blockDim.x * 2);
 		//
 
@@ -754,7 +755,7 @@ TEST_P(FailNTTTest, TestLimbINTTSecondHalfSmall) {
 
 TEST_P(FailNTTTest, TestLimbINTTSecondHalf) {
 	int devcount = -1;
-	cudaGetDeviceCount(&devcount);
+	hipGetDeviceCount(&devcount);
 
 	std::vector<int> GPUs;
 	for (int i = 0; i < devcount; ++i)
@@ -768,7 +769,7 @@ TEST_P(FailNTTTest, TestLimbINTTSecondHalf) {
 	CudaCheckErrorMod;
 
 	for (int l : { 0 }) {
-		cudaSetDevice(GPUs[0]);
+		hipSetDevice(GPUs[0]);
 		FIDESlib::Stream s;
 		s.init();
 
@@ -800,7 +801,7 @@ TEST_P(FailNTTTest, TestLimbINTTSecondHalf) {
 		limb2.load(aux);
 		aux.free(limb2.stream);
 		limb2.store(res_gpu);
-		cudaDeviceSynchronize();
+		hipDeviceSynchronize();
 		// res_gpu.resize(blockDim.x * 2);
 		//
 
@@ -849,7 +850,7 @@ constexpr bool VERBOSE = false;
 
 TEST_P(NTTTest, TestLimbNTTsmall) {
 	int devcount = -1;
-	cudaGetDeviceCount(&devcount);
+	hipGetDeviceCount(&devcount);
 
 	std::vector<int> GPUs;
 	for (int i = 0; i < devcount; ++i)
@@ -864,7 +865,7 @@ TEST_P(NTTTest, TestLimbNTTsmall) {
 	CudaCheckErrorMod;
 
 	for (int l : { 0 }) {
-		cudaSetDevice(GPUs[0]);
+		hipSetDevice(GPUs[0]);
 		FIDESlib::Stream s;
 		s.init();
 
@@ -882,7 +883,7 @@ TEST_P(NTTTest, TestLimbNTTsmall) {
 		CudaCheckErrorMod;
 		std::vector<uint64_t> res_gpu;
 		limb2.store(res_gpu);
-		cudaDeviceSynchronize();
+		hipDeviceSynchronize();
 		CudaCheckErrorMod;
 		// std::sort(res_cpu.begin(), res_cpu.end());
 		for (size_t i = 0; i < res_gpu.size(); ++i) {
@@ -914,7 +915,7 @@ TEST_P(NTTTest, TestLimbNTTsmall) {
 		CudaCheckErrorMod;
 
 		limb2.store(res_gpu);
-		cudaDeviceSynchronize();
+		hipDeviceSynchronize();
 		FIDESlib::bit_reverse_vector(res_gpu);
 		CudaCheckErrorMod;
 		// std::sort(res_cpu.begin(), res_cpu.end());
@@ -928,7 +929,7 @@ TEST_P(NTTTest, TestLimbNTTsmall) {
 
 TEST_P(NTTTest, TestLimbNTT) {
 	int devcount = -1;
-	cudaGetDeviceCount(&devcount);
+	hipGetDeviceCount(&devcount);
 
 	std::vector<int> GPUs;
 	for (int i = 0; i < devcount; ++i)
@@ -942,7 +943,7 @@ TEST_P(NTTTest, TestLimbNTT) {
 	CudaCheckErrorMod;
 
 	for (int l : { 0 }) {
-		cudaSetDevice(GPUs[0]);
+		hipSetDevice(GPUs[0]);
 		FIDESlib::Stream s;
 		s.init();
 
@@ -960,7 +961,7 @@ TEST_P(NTTTest, TestLimbNTT) {
 		CudaCheckErrorMod;
 		std::vector<uint64_t> res_gpu;
 		limb2.store(res_gpu);
-		cudaDeviceSynchronize();
+		hipDeviceSynchronize();
 
 		// std::sort(res_cpu.begin(), res_cpu.end());
 		for (size_t i = 0; i < res_gpu.size(); ++i) {
@@ -991,7 +992,7 @@ TEST_P(NTTTest, TestLimbNTT) {
 		limb2.NTT<FIDESlib::ALGO_BARRETT>();
 
 		limb2.store(res_gpu);
-		cudaDeviceSynchronize();
+		hipDeviceSynchronize();
 		FIDESlib::bit_reverse_vector(res_gpu);
 		// std::sort(res_cpu.begin(), res_cpu.end());
 		// std::sort(res_gpu.begin(), res_gpu.end());
@@ -1005,7 +1006,7 @@ TEST_P(NTTTest, TestLimbNTT) {
 		limb2.NTT<FIDESlib::ALGO_SHOUP>();
 
 		limb2.store(res_gpu);
-		cudaDeviceSynchronize();
+		hipDeviceSynchronize();
 		FIDESlib::bit_reverse_vector(res_gpu);
 		// std::sort(res_cpu.begin(), res_cpu.end());
 		// std::sort(res_gpu.begin(), res_gpu.end());
@@ -1023,7 +1024,7 @@ TEST_P(NTTTest, TestLimbNTT) {
 		}
 
 		limb2.store(res_gpu);
-		cudaDeviceSynchronize();
+		hipDeviceSynchronize();
 		FIDESlib::bit_reverse_vector(res_gpu);
 		// std::sort(res_cpu.begin(), res_cpu.end());
 		// std::sort(res_gpu.begin(), res_gpu.end());
@@ -1037,7 +1038,7 @@ TEST_P(NTTTest, TestLimbNTT) {
 
 TEST_P(FailNTTTest32, TestLimbNTT32) {
 	int devcount = -1;
-	cudaGetDeviceCount(&devcount);
+	hipGetDeviceCount(&devcount);
 
 	std::vector<int> GPUs;
 	for (int i = 0; i < devcount; ++i)
@@ -1051,7 +1052,7 @@ TEST_P(FailNTTTest32, TestLimbNTT32) {
 	CudaCheckErrorMod;
 
 	for (int l : { 0 }) {
-		cudaSetDevice(GPUs[0]);
+		hipSetDevice(GPUs[0]);
 		FIDESlib::Stream s;
 		s.init();
 
@@ -1069,7 +1070,7 @@ TEST_P(FailNTTTest32, TestLimbNTT32) {
 		CudaCheckErrorMod;
 		std::vector<uint64_t> res_gpu;
 		limb2.store(res_gpu);
-		cudaDeviceSynchronize();
+		hipDeviceSynchronize();
 
 		// std::sort(res_cpu.begin(), res_cpu.end());
 		for (size_t i = 0; i < res_gpu.size(); ++i) {
@@ -1100,7 +1101,7 @@ TEST_P(FailNTTTest32, TestLimbNTT32) {
 		limb2.NTT<FIDESlib::ALGO_BARRETT>();
 
 		limb2.store(res_gpu);
-		cudaDeviceSynchronize();
+		hipDeviceSynchronize();
 		FIDESlib::bit_reverse_vector(res_gpu);
 		// std::sort(res_cpu.begin(), res_cpu.end());
 		// std::sort(res_gpu.begin(), res_gpu.end());
@@ -1113,7 +1114,7 @@ TEST_P(FailNTTTest32, TestLimbNTT32) {
 
 TEST_P(FailNTTTest, TestLimbNTTtoINTT) {
 	int devcount = -1;
-	cudaGetDeviceCount(&devcount);
+	hipGetDeviceCount(&devcount);
 
 	std::vector<int> GPUs;
 	for (int i = 0; i < devcount; ++i)
@@ -1127,7 +1128,7 @@ TEST_P(FailNTTTest, TestLimbNTTtoINTT) {
 	CudaCheckErrorMod;
 
 	for (int l : { 0 }) {
-		cudaSetDevice(GPUs[0]);
+		hipSetDevice(GPUs[0]);
 		FIDESlib::Stream s;
 		s.init();
 
@@ -1160,7 +1161,7 @@ TEST_P(FailNTTTest, TestLimbNTTtoINTT) {
 
 		std::vector<uint64_t> res_gpu;
 		limb2.store(res_gpu);
-		cudaDeviceSynchronize();
+		hipDeviceSynchronize();
 
 		// std::sort(res_cpu.begin(), res_cpu.end());
 		for (size_t i = 0; i < res_gpu.size(); ++i) {
@@ -1190,7 +1191,7 @@ TEST_P(FailNTTTest, TestLimbNTTtoINTT) {
 
 TEST_P(FailNTTTest, TestCPUntt_2d) {
 	int devcount = -1;
-	cudaGetDeviceCount(&devcount);
+	hipGetDeviceCount(&devcount);
 
 	std::vector<int> GPUs;
 	for (int i = 0; i < devcount; ++i)
@@ -1204,7 +1205,7 @@ TEST_P(FailNTTTest, TestCPUntt_2d) {
 	CudaCheckErrorMod;
 
 	for (int l : { 0 }) {
-		cudaSetDevice(GPUs[0]);
+		hipSetDevice(GPUs[0]);
 
 		std::vector<uint64_t> v2(cc.N, 10);
 		for (auto& i : v2)
@@ -1245,7 +1246,7 @@ TEST_P(FailNTTTest, TestCPUntt_2d) {
 
 TEST_P(NTTTest, TestLimbInverseNTTsmall) {
 	int devcount = -1;
-	cudaGetDeviceCount(&devcount);
+	hipGetDeviceCount(&devcount);
 
 	std::vector<int> GPUs;
 	for (int i = 0; i < devcount; ++i)
@@ -1260,7 +1261,7 @@ TEST_P(NTTTest, TestLimbInverseNTTsmall) {
 	CudaCheckErrorMod;
 
 	for (int l : { 0 }) {
-		cudaSetDevice(GPUs[0]);
+		hipSetDevice(GPUs[0]);
 		FIDESlib::Stream s;
 		s.init();
 
@@ -1272,7 +1273,7 @@ TEST_P(NTTTest, TestLimbInverseNTTsmall) {
 		limb2.NTT<FIDESlib::ALGO_NATIVE>();
 		std::vector<uint64_t> res_gpu;
 		limb2.store(res_gpu);
-		cudaDeviceSynchronize();
+		hipDeviceSynchronize();
 		std::vector<uint64_t> res_cpu(v2);
 		nega_fft2_forPrime(res_cpu, false, 0);
 		FIDESlib::bit_reverse_vector(res_cpu);
@@ -1282,7 +1283,7 @@ TEST_P(NTTTest, TestLimbInverseNTTsmall) {
 		limb2.INTT<FIDESlib::ALGO_NATIVE>();
 
 		limb2.store(res_gpu);
-		cudaDeviceSynchronize();
+		hipDeviceSynchronize();
 		FIDESlib::bit_reverse_vector(res_cpu);
 		nega_fft2_forPrime(res_cpu, true, 0);
 
@@ -1299,7 +1300,7 @@ TEST_P(NTTTest, TestLimbInverseNTTsmall) {
 
 TEST_P(NTTTest, TestLimbInverseNTT) {
 	int devcount = -1;
-	cudaGetDeviceCount(&devcount);
+	hipGetDeviceCount(&devcount);
 
 	std::vector<int> GPUs;
 	for (int i = 0; i < devcount; ++i)
@@ -1314,7 +1315,7 @@ TEST_P(NTTTest, TestLimbInverseNTT) {
 	for (int l : { 0 }) {
 		for (int primeid = 0; primeid < cc.L + cc.K + 1; ++primeid) {
 			// std::cout << primeid << std::endl;
-			cudaSetDevice(GPUs[0]);
+			hipSetDevice(GPUs[0]);
 			FIDESlib::Stream s;
 			s.init();
 
@@ -1330,7 +1331,7 @@ TEST_P(NTTTest, TestLimbInverseNTT) {
 
 				std::vector<uint64_t> res_gpu;
 				limb2.store(res_gpu);
-				cudaDeviceSynchronize();
+				hipDeviceSynchronize();
 
 				std::vector<uint64_t> res_cpu(v2);
 				nega_fft2_forPrime(res_cpu, false, primeid);
@@ -1342,7 +1343,7 @@ TEST_P(NTTTest, TestLimbInverseNTT) {
 				limb2.INTT<FIDESlib::ALGO_NATIVE>();
 
 				limb2.store(res_gpu);
-				cudaDeviceSynchronize();
+				hipDeviceSynchronize();
 
 				nega_fft2_forPrime(res_cpu, true, primeid);
 				CudaCheckErrorMod;
@@ -1358,7 +1359,7 @@ TEST_P(NTTTest, TestLimbInverseNTT) {
 
 				std::vector<uint64_t> res_gpu;
 				limb2.store(res_gpu);
-				cudaDeviceSynchronize();
+				hipDeviceSynchronize();
 
 				std::vector<uint64_t> res_cpu(v2);
 				nega_fft2_forPrime(res_cpu, false, primeid);
@@ -1370,7 +1371,7 @@ TEST_P(NTTTest, TestLimbInverseNTT) {
 				limb2.INTT<FIDESlib::ALGO_BARRETT>();
 
 				limb2.store(res_gpu);
-				cudaDeviceSynchronize();
+				hipDeviceSynchronize();
 
 				nega_fft2_forPrime(res_cpu, true, primeid);
 
@@ -1386,7 +1387,7 @@ TEST_P(NTTTest, TestLimbInverseNTT) {
 
 				std::vector<uint64_t> res_gpu;
 				limb2.store(res_gpu);
-				cudaDeviceSynchronize();
+				hipDeviceSynchronize();
 
 				std::vector<uint64_t> res_cpu(v2);
 				nega_fft2_forPrime(res_cpu, false, primeid);
@@ -1398,7 +1399,7 @@ TEST_P(NTTTest, TestLimbInverseNTT) {
 				limb2.INTT<FIDESlib::ALGO_SHOUP>();
 
 				limb2.store(res_gpu);
-				cudaDeviceSynchronize();
+				hipDeviceSynchronize();
 
 				nega_fft2_forPrime(res_cpu, true, primeid);
 
@@ -1414,7 +1415,7 @@ TEST_P(NTTTest, TestLimbInverseNTT) {
 
 				std::vector<uint64_t> res_gpu;
 				limb2.store(res_gpu);
-				cudaDeviceSynchronize();
+				hipDeviceSynchronize();
 
 				std::vector<uint64_t> res_cpu(v2);
 				nega_fft2_forPrime(res_cpu, false, primeid);
@@ -1430,7 +1431,7 @@ TEST_P(NTTTest, TestLimbInverseNTT) {
 				}
 
 				limb2.store(res_gpu);
-				cudaDeviceSynchronize();
+				hipDeviceSynchronize();
 
 				nega_fft2_forPrime(res_cpu, true, primeid);
 
@@ -1447,7 +1448,7 @@ TEST_P(NTTTest, TestLimbInverseNTT) {
 
 TEST_P(NTTTest, LimbBatchTestINTT) {
 	int devcount = -1;
-	cudaGetDeviceCount(&devcount);
+	hipGetDeviceCount(&devcount);
 
 	std::vector<int> GPUs;
 	for (int i = 0; i < devcount; ++i)
@@ -1469,18 +1470,18 @@ TEST_P(NTTTest, LimbBatchTestINTT) {
 			i = rand();
 
 		for (auto& part : poly.GPU) {
-			cudaSetDevice(part.device);
+			hipSetDevice(part.device);
 			for (auto& limb : part.limb)
 				SWITCH(limb, load(v2));
 		}
 		CudaCheckErrorMod;
 
 		std::vector<std::vector<uint64_t>> res_gpu;
-		cudaDeviceSynchronize();
+		hipDeviceSynchronize();
 		poly.NTT<FIDESlib::ALGO_SHOUP>(batch, false);
-		cudaDeviceSynchronize();
+		hipDeviceSynchronize();
 		poly.store(res_gpu);
-		cudaDeviceSynchronize();
+		hipDeviceSynchronize();
 		std::vector<std::vector<uint64_t>> res_cpu(cc.L + 1, std::vector<uint64_t>(v2));
 		for (int i = 0; i <= cc.L; ++i) {
 			nega_fft2_forPrime(res_cpu[i], false, i);
@@ -1491,11 +1492,11 @@ TEST_P(NTTTest, LimbBatchTestINTT) {
 			ASSERT_EQ(res_cpu, res_gpu);
 		}
 		CudaCheckErrorMod;
-		cudaDeviceSynchronize();
+		hipDeviceSynchronize();
 		poly.INTT<FIDESlib::ALGO_SHOUP>(batch, false);
-		cudaDeviceSynchronize();
+		hipDeviceSynchronize();
 		poly.store(res_gpu);
-		cudaDeviceSynchronize();
+		hipDeviceSynchronize();
 		for (int i = 0; i <= cc.L; ++i) {
 			FIDESlib::bit_reverse_vector(res_cpu[i]);
 			nega_fft2_forPrime(res_cpu[i], true, i);
@@ -1512,15 +1513,15 @@ TEST_P(NTTTest, LimbBatchTestINTT) {
 			i = rand();
 
 		for (auto& part : poly.GPU) {
-			cudaSetDevice(part.device);
+			hipSetDevice(part.device);
 			for (auto& limb : part.limb)
 				SWITCH(limb, load(v2));
 		}
 
 		std::vector<std::vector<uint64_t>> res_gpu;
-		cudaDeviceSynchronize();
+		hipDeviceSynchronize();
 		poly.NTT<FIDESlib::ALGO_BARRETT>(batch, false);
-		cudaDeviceSynchronize();
+		hipDeviceSynchronize();
 		poly.store(res_gpu);
 		std::vector<std::vector<uint64_t>> res_cpu(cc.L + 1, std::vector<uint64_t>(v2));
 		for (int i = 0; i <= cc.L; ++i) {
@@ -1531,9 +1532,9 @@ TEST_P(NTTTest, LimbBatchTestINTT) {
 			CudaCheckErrorMod;
 			ASSERT_EQ(res_cpu, res_gpu);
 		}
-		cudaDeviceSynchronize();
+		hipDeviceSynchronize();
 		poly.INTT<FIDESlib::ALGO_BARRETT>(batch, false);
-		cudaDeviceSynchronize();
+		hipDeviceSynchronize();
 		poly.store(res_gpu);
 		for (int i = 0; i <= cc.L; ++i) {
 			FIDESlib::bit_reverse_vector(res_cpu[i]);

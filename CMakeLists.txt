@@ -13,16 +13,32 @@
 # SPDX-License-Identifier: MIT
 # cmake-format: on
 
-cmake_minimum_required(VERSION 3.25.2)
+cmake_minimum_required(VERSION 3.21.3)
 cmake_policy(VERSION 3.21.3...3.30)
 
 # ############## Project configuration ###################
 
+option(FIDESLIB_USE_HIP
+       "Compile FIDESlib for AMD GPUs via HIP/ROCm instead of CUDA." OFF)
+
+if(FIDESLIB_USE_HIP)
+  set(FIDESLIB_GPU_LANG HIP)
+else()
+  set(FIDESLIB_GPU_LANG CUDA)
+endif()
+
 # Set target architectures.
 if(NOT DEFINED FIDESLIB_ARCH)
-  set(FIDESLIB_ARCH
-      "70-real;75-real;80-real;86-real;89-real;90-real;90-virtual"
-      CACHE STRING "Set the backend architecture target.")
+  if(FIDESLIB_USE_HIP)
+    # AMD gfx targets: gfx90a = MI210/MI250, gfx942 = MI300.
+    set(FIDESLIB_ARCH
+        "gfx90a;gfx942"
+        CACHE STRING "Set the backend architecture target (AMD gfx).")
+  else()
+    set(FIDESLIB_ARCH
+        "70-real;75-real;80-real;86-real;89-real;90-real;90-virtual"
+        CACHE STRING "Set the backend architecture target (NVIDIA sm).")
+  endif()
 endif()
 
 # Set build type.
@@ -93,37 +109,65 @@ if(NOT DEFINED CMAKE_CXX_COMPILER AND DEFINED ENV{CXX})
   set(CMAKE_CXX_COMPILER "$ENV{CXX}")
 endif()
 
-# ############## CUDA Configuration ###################
+# ############## GPU toolchain configuration ###################
 
-# Set CUDA_PATH if not defined previously.
-if(NOT DEFINED CUDA_PATH)
-  if(DEFINED CUDAToolkit_ROOT)
-    set(CUDA_PATH "${CUDAToolkit_ROOT}")
-  elseif(DEFINED ENV{CUDA_PATH})
-    set(CUDA_PATH "$ENV{CUDA_PATH}")
-  elseif(DEFINED ENV{CUDA_HOME})
-    set(CUDA_PATH "$ENV{CUDA_HOME}")
-  else()
-    set(CUDA_PATH "/usr/local/cuda")
+if(FIDESLIB_USE_HIP)
+  if(NOT DEFINED ROCM_PATH)
+    if(DEFINED ENV{ROCM_PATH})
+      set(ROCM_PATH "$ENV{ROCM_PATH}")
+    else()
+      set(ROCM_PATH "/opt/rocm")
+    endif()
   endif()
-endif()
 
-if(NOT DEFINED CMAKE_CUDA_COMPILER)
-  set(CMAKE_CUDA_COMPILER "${CUDA_PATH}/bin/nvcc")
-endif()
+  if(NOT EXISTS "${ROCM_PATH}")
+    message(FATAL_ERROR "ROCm not found at ${ROCM_PATH}. Please install ROCm "
+                        "or set -DROCM_PATH=...")
+  endif()
 
-# Check if CUDA is installed.
-if(NOT EXISTS "${CUDA_PATH}")
-  message(FATAL_ERROR "CUDA not found at ${CUDA_PATH}. Please install CUDA.")
-endif()
+  # Let find_package(hip/rccl) and the HIP language locate ROCm's config files.
+  list(APPEND CMAKE_PREFIX_PATH "${ROCM_PATH}" "${ROCM_PATH}/lib/cmake")
 
-# Global language config.
-set(CMAKE_CUDA_ARCHITECTURES "${FIDESLIB_ARCH}")
-set(CMAKE_CUDA_STANDARD 20)
-set(CMAKE_CUDA_STANDARD_REQUIRED ON)
-set(CMAKE_CUDA_EXTENSIONS ON)
-if(NOT DEFINED CMAKE_CUDA_HOST_COMPILER AND DEFINED CMAKE_CXX_COMPILER)
-  set(CMAKE_CUDA_HOST_COMPILER "${CMAKE_CXX_COMPILER}")
+  if(NOT DEFINED CMAKE_HIP_COMPILER)
+    set(CMAKE_HIP_COMPILER "${ROCM_PATH}/llvm/bin/amdclang++")
+  endif()
+
+  set(CMAKE_HIP_ARCHITECTURES "${FIDESLIB_ARCH}")
+  set(CMAKE_HIP_STANDARD 20)
+  set(CMAKE_HIP_STANDARD_REQUIRED ON)
+  set(CMAKE_HIP_EXTENSIONS ON)
+else()
+  # -------- CUDA --------
+  # Set CUDA_PATH if not defined previously.
+  if(NOT DEFINED CUDA_PATH)
+    if(DEFINED CUDAToolkit_ROOT)
+      set(CUDA_PATH "${CUDAToolkit_ROOT}")
+    elseif(DEFINED ENV{CUDA_PATH})
+      set(CUDA_PATH "$ENV{CUDA_PATH}")
+    elseif(DEFINED ENV{CUDA_HOME})
+      set(CUDA_PATH "$ENV{CUDA_HOME}")
+    else()
+      set(CUDA_PATH "/usr/local/cuda")
+    endif()
+  endif()
+
+  if(NOT DEFINED CMAKE_CUDA_COMPILER)
+    set(CMAKE_CUDA_COMPILER "${CUDA_PATH}/bin/nvcc")
+  endif()
+
+  # Check if CUDA is installed.
+  if(NOT EXISTS "${CUDA_PATH}")
+    message(FATAL_ERROR "CUDA not found at ${CUDA_PATH}. Please install CUDA.")
+  endif()
+
+  # Global language config.
+  set(CMAKE_CUDA_ARCHITECTURES "${FIDESLIB_ARCH}")
+  set(CMAKE_CUDA_STANDARD 20)
+  set(CMAKE_CUDA_STANDARD_REQUIRED ON)
+  set(CMAKE_CUDA_EXTENSIONS ON)
+  if(NOT DEFINED CMAKE_CUDA_HOST_COMPILER AND DEFINED CMAKE_CXX_COMPILER)
+    set(CMAKE_CUDA_HOST_COMPILER "${CMAKE_CXX_COMPILER}")
+  endif()
 endif()
 
 # ############### Project Definition ###################
@@ -132,14 +176,20 @@ project(
   fideslib
   VERSION 2.1.0
   DESCRIPTION "Homomorphic Encryption Library"
-  LANGUAGES CXX CUDA)
+  LANGUAGES CXX)
+
+enable_language(${FIDESLIB_GPU_LANG})
 
 # ############### Extra Flags ###################
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall")
-set(CMAKE_CUDA_FLAGS
-    "${CMAKE_CUDA_FLAGS} -Wno-deprecated-gpu-targets -Wno-restrict -Wall -rdc=true --diag-suppress=3133,611"
-)
+if(FIDESLIB_USE_HIP)
+  set(CMAKE_HIP_FLAGS "${CMAKE_HIP_FLAGS} -Wall -fgpu-rdc -include ${CMAKE_CURRENT_SOURCE_DIR}/src/hip_compat.cuh")
+else()
+  set(CMAKE_CUDA_FLAGS
+      "${CMAKE_CUDA_FLAGS} -Wno-deprecated-gpu-targets -Wno-restrict -Wall -rdc=true --diag-suppress=3133,611"
+  )
+endif()
 
 # ############## Utils ###################
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
@@ -149,27 +199,41 @@ include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)
 include(ClangFormat)
 
-# ############### CUDA Libraries ###################
+# ############### GPU runtime + collectives ###################
 
-find_package(CUDAToolkit REQUIRED)
-if(NOT CUDAToolkit_FOUND)
-  message(FATAL_ERROR "CUDA not found!")
-else()
-  message(STATUS "CUDA found: ${CUDAToolkit_VERSION}")
-  message(STATUS "CUDA include path: ${CUDAToolkit_INCLUDE_DIRS}")
-endif()
+if(FIDESLIB_USE_HIP)
+  find_package(hip REQUIRED)
+  message(STATUS "HIP found: ${hip_VERSION}")
 
-# Check for NCCL installation. Do not do anything more. It is managed by CUDA.
-# This is just to enable conditional NCCL-dependent code.
-find_library(
-  nccl_FOUND
-  NAMES nccl
-  HINTS /usr/local/cuda/lib64 /usr/lib /usr/local/lib)
-if(nccl_FOUND)
-  message(STATUS "Found NCCL: ${nccl_FOUND}")
-  add_compile_definitions(MULTI_GPU NCCL RCCL)
+  find_library(
+    nccl_FOUND
+    NAMES rccl
+    HINTS "${ROCM_PATH}/lib" "${ROCM_PATH}/rccl/lib")
+  if(nccl_FOUND)
+    message(STATUS "Found RCCL: ${nccl_FOUND}")
+    add_compile_definitions(MULTI_GPU NCCL RCCL)
+  else()
+    message(STATUS "RCCL not found: building without multi-GPU support")
+  endif()
 else()
-  message(STATUS "NCCL not found: building without NCCL support")
+  find_package(CUDAToolkit REQUIRED)
+  if(NOT CUDAToolkit_FOUND)
+    message(FATAL_ERROR "CUDA not found!")
+  else()
+    message(STATUS "CUDA found: ${CUDAToolkit_VERSION}")
+    message(STATUS "CUDA include path: ${CUDAToolkit_INCLUDE_DIRS}")
+  endif()
+
+  find_library(
+    nccl_FOUND
+    NAMES nccl
+    HINTS /usr/local/cuda/lib64 /usr/lib /usr/local/lib)
+  if(nccl_FOUND)
+    message(STATUS "Found NCCL: ${nccl_FOUND}")
+    add_compile_definitions(MULTI_GPU NCCL RCCL)
+  else()
+    message(STATUS "NCCL not found: building without NCCL support")
+  endif()
 endif()
 
 # ############## OpenFHE Configuration ###################
@@ -221,29 +285,48 @@ elseif(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
 endif()
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${FIX_OMP_FLAGS}")
-set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -Xcompiler ${FIX_OMP_FLAGS}")
+if(FIDESLIB_USE_HIP)
+  set(CMAKE_HIP_FLAGS "${CMAKE_HIP_FLAGS} ${FIX_OMP_FLAGS}")
+else()
+  set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -Xcompiler ${FIX_OMP_FLAGS}")
+endif()
 
 # ############## Optimization Flags ###################
 
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O0")
-  set(CMAKE_CUDA_FLAGS
-      "${CMAKE_CUDA_FLAGS} -O0 -Xcompiler -O0 -Xcompiler -g -G")
-elseif(CMAKE_BUILD_TYPE STREQUAL "Release")
-  include(CheckIPOSupported)
-  check_ipo_supported(RESULT supported OUTPUT error)
-
-  if(supported)
-    message(STATUS "IPO / LTO enabled")
-    set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
+  if(FIDESLIB_USE_HIP)
+    set(CMAKE_HIP_FLAGS "${CMAKE_HIP_FLAGS} -O0 -g")
   else()
-    message(STATUS "IPO / LTO not supported: <${error}>")
+    set(CMAKE_CUDA_FLAGS
+        "${CMAKE_CUDA_FLAGS} -O0 -Xcompiler -O0 -Xcompiler -g -G")
   endif()
-  set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -Xcompiler -O3")
+elseif(CMAKE_BUILD_TYPE STREQUAL "Release")
+  if(FIDESLIB_USE_HIP)
+    set(CMAKE_HIP_FLAGS "${CMAKE_HIP_FLAGS} -O3")
+  else()
+    include(CheckIPOSupported)
+    check_ipo_supported(RESULT supported OUTPUT error)
+    if(supported)
+      message(STATUS "IPO / LTO enabled")
+      set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
+    else()
+      message(STATUS "IPO / LTO not supported: <${error}>")
+    endif()
+    set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -Xcompiler -O3")
+  endif()
 elseif(CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
-  set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -Xcompiler -O2 -Xcompiler -g")
+  if(FIDESLIB_USE_HIP)
+    set(CMAKE_HIP_FLAGS "${CMAKE_HIP_FLAGS} -O2 -g")
+  else()
+    set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -Xcompiler -O2 -Xcompiler -g")
+  endif()
 elseif(CMAKE_BUILD_TYPE STREQUAL "MinSizeRel")
-  set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -Xcompiler -Os")
+  if(FIDESLIB_USE_HIP)
+    set(CMAKE_HIP_FLAGS "${CMAKE_HIP_FLAGS} -Os")
+  else()
+    set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -Xcompiler -Os")
+  endif()
 endif()
 
 # ############## Configuration export ###################
@@ -255,8 +338,10 @@ set(INSTALL_LIBRARY_DIR "${CMAKE_INSTALL_LIBDIR}")
 set(INSTALL_BINARY_DIR "${CMAKE_INSTALL_BINDIR}")
 set(INSTALL_DATA_DIR "${CMAKE_INSTALL_DATADIR}/${PROJECT_NAME}/cmake")
 
-# ############## NVTX ###################
-include(nvtx/c/nvtxImportedTargets.cmake)
+# ############## NVTX / ROCTX profiling ###################
+if(NOT FIDESLIB_USE_HIP)
+  include(nvtx/c/nvtxImportedTargets.cmake)
+endif()
 
 # ############## FIDESlib Definition ###################
 
@@ -269,9 +354,9 @@ file(GLOB_RECURSE HEADER_FILES_CUDA ${SOURCE_DIR}/*.cuh)
 file(GLOB_RECURSE HEADER_FILES_CXX ${SOURCE_DIR}/*.hpp ${SOURCE_DIR}/*.h
      ${SOURCE_DIR}/*.inc)
 set_source_files_properties(${SOURCE_FILES_CUDA} ${HEADER_FILES_CUDA}
-                            PROPERTIES LANGUAGE CUDA)
+                            PROPERTIES LANGUAGE ${FIDESLIB_GPU_LANG})
 set_source_files_properties(${SOURCE_FILES_CXX} ${HEADER_FILES_CXX}
-                            PROPERTIES LANGUAGE CXX)
+                            PROPERTIES LANGUAGE ${FIDESLIB_GPU_LANG})
 
 file(GLOB_RECURSE SOURCE_FILES_API ${API_DIR}/*.cpp)
 file(GLOB_RECURSE HEADER_FILES_PUBLIC ${API_DIR}/*.hpp)
@@ -316,44 +401,63 @@ target_link_libraries(
   PRIVATE "${OpenFHE_LIBDIR}/libOPENFHEbinfhe_static.a"
   PRIVATE "${OpenFHE_LIBDIR}/libOPENFHEcore_static.a")
 
-target_link_libraries(
-  fideslib
-  PRIVATE CUDA::cudart
-  PRIVATE CUDA::cuda_driver)
+if(FIDESLIB_USE_HIP)
+  target_link_libraries(fideslib PRIVATE hip::device)
+else()
+  target_link_libraries(
+    fideslib
+    PRIVATE CUDA::cudart
+    PRIVATE CUDA::cuda_driver)
+endif()
 
 target_link_options(fideslib PRIVATE -static-libstdc++ -static-libgcc)
 
 if(nccl_FOUND)
-  message(STATUS "FIDESlib linked against NCCL")
-  target_link_libraries(fideslib PRIVATE nccl)
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DNCCL")
-  set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -Xcompiler -DNCCL")
+  if(FIDESLIB_USE_HIP)
+    message(STATUS "FIDESlib linked against RCCL")
+    target_link_libraries(fideslib PRIVATE "${nccl_FOUND}")
+  else()
+    message(STATUS "FIDESlib linked against NCCL")
+    target_link_libraries(fideslib PRIVATE nccl)
+  endif()
+  target_compile_definitions(fideslib PRIVATE NCCL)
 endif()
 
-set_target_properties(
-  fideslib
-  PROPERTIES CUDA_SEPARABLE_COMPILATION ON
-             POSITION_INDEPENDENT_CODE ON
-             CUDA_RESOLVE_DEVICE_SYMBOLS ON
-             PREFIX "")
+if(FIDESLIB_USE_HIP)
+  set_target_properties(fideslib PROPERTIES POSITION_INDEPENDENT_CODE ON
+                                            PREFIX "")
+  target_link_options(fideslib PRIVATE -fgpu-rdc --hip-link)
+else()
+  set_target_properties(
+    fideslib
+    PROPERTIES CUDA_SEPARABLE_COMPILATION ON
+               POSITION_INDEPENDENT_CODE ON
+               CUDA_RESOLVE_DEVICE_SYMBOLS ON
+               PREFIX "")
+endif()
 
 # ############## GPU Checker ###################
 
 add_executable(gpu-test)
 
 file(GLOB_RECURSE GPUTEST_SOURCES other/GPUTest.cpp)
-set_source_files_properties(${GPUTEST_SOURCES} PROPERTIES LANGUAGE CUDA)
+set_source_files_properties(${GPUTEST_SOURCES} PROPERTIES LANGUAGE
+                            ${FIDESLIB_GPU_LANG})
 
 target_sources(gpu-test PRIVATE ${GPUTEST_SOURCES})
 set_target_properties(gpu-test PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
-target_link_libraries(gpu-test PRIVATE CUDA::cudart)
-
-set_target_properties(
-  gpu-test
-  PROPERTIES CUDA_RESOLVE_DEVICE_SYMBOLS ON
-             CUDA_SEPARABLE_COMPILATION ON
-             POSITION_INDEPENDENT_CODE ON)
+if(FIDESLIB_USE_HIP)
+  target_link_libraries(gpu-test PRIVATE hip::device)
+  set_target_properties(gpu-test PROPERTIES POSITION_INDEPENDENT_CODE ON)
+else()
+  target_link_libraries(gpu-test PRIVATE CUDA::cudart)
+  set_target_properties(
+    gpu-test
+    PROPERTIES CUDA_RESOLVE_DEVICE_SYMBOLS ON
+               CUDA_SEPARABLE_COMPILATION ON
+               POSITION_INDEPENDENT_CODE ON)
+endif()
 
 # ############## Dummy executable ###################
 
@@ -377,13 +481,16 @@ target_sources(
 
 target_link_libraries(dummy PRIVATE fideslib)
 
-set_target_properties(
-  dummy
-  PROPERTIES CUDA_RESOLVE_DEVICE_SYMBOLS ON
-             CUDA_SEPARABLE_COMPILATION ON
-             POSITION_INDEPENDENT_CODE ON)
-
-set_target_properties(dummy PROPERTIES CUDA_RESOLVE_DEVICE_SYMBOLS ON)
+if(NOT FIDESLIB_USE_HIP)
+  set_target_properties(
+    dummy
+    PROPERTIES CUDA_RESOLVE_DEVICE_SYMBOLS ON
+               CUDA_SEPARABLE_COMPILATION ON
+               POSITION_INDEPENDENT_CODE ON)
+  set_target_properties(dummy PROPERTIES CUDA_RESOLVE_DEVICE_SYMBOLS ON)
+else()
+  set_target_properties(dummy PROPERTIES POSITION_INDEPENDENT_CODE ON)
+endif()
 
 # ############## Library Installation ###################
 
@@ -447,7 +554,8 @@ if(FIDESLIB_COMPILE_TESTS)
 
   file(GLOB_RECURSE TEST_SOURCE ${TEST_SOURCE_DIR}/*.cpp
        ${TEST_SOURCE_DIR}/*.cu)
-  set_source_files_properties(${TEST_SOURCE} PROPERTIES LANGUAGE CUDA)
+  set_source_files_properties(${TEST_SOURCE} PROPERTIES LANGUAGE
+                              ${FIDESLIB_GPU_LANG})
 
   add_executable(fideslib-test)
 
@@ -471,11 +579,16 @@ if(FIDESLIB_COMPILE_TESTS)
     PRIVATE gtest_main
     PRIVATE fideslib)
 
-  set_target_properties(
-    fideslib-test
-    PROPERTIES CUDA_RESOLVE_DEVICE_SYMBOLS ON
-               CUDA_SEPARABLE_COMPILATION ON
-               POSITION_INDEPENDENT_CODE ON)
+  if(NOT FIDESLIB_USE_HIP)
+    set_target_properties(
+      fideslib-test
+      PROPERTIES CUDA_RESOLVE_DEVICE_SYMBOLS ON
+                 CUDA_SEPARABLE_COMPILATION ON
+                 POSITION_INDEPENDENT_CODE ON)
+  else()
+    set_target_properties(fideslib-test PROPERTIES POSITION_INDEPENDENT_CODE ON)
+    target_link_options(fideslib-test PRIVATE -fgpu-rdc --hip-link)
+  endif()
 
 endif()
 
@@ -512,7 +625,8 @@ if(FIDESLIB_COMPILE_BENCHMARKS)
 
   file(GLOB_RECURSE BENCH_SOURCE_FILES ${BENCH_SOURCE_DIR}/*.cu
        ${BENCH_SOURCE_DIR}/*.cpp)
-  set_source_files_properties(${BENCH_SOURCE_FILES} PROPERTIES LANGUAGE CUDA)
+  set_source_files_properties(${BENCH_SOURCE_FILES} PROPERTIES LANGUAGE
+                              ${FIDESLIB_GPU_LANG})
 
   add_executable(fideslib-bench)
 
@@ -534,10 +648,15 @@ if(FIDESLIB_COMPILE_BENCHMARKS)
     PRIVATE benchmark::benchmark
     PRIVATE fideslib)
 
-  set_target_properties(
-    fideslib-bench
-    PROPERTIES CUDA_RESOLVE_DEVICE_SYMBOLS ON
-               CUDA_SEPARABLE_COMPILATION ON
-               POSITION_INDEPENDENT_CODE ON)
+  if(NOT FIDESLIB_USE_HIP)
+    set_target_properties(
+      fideslib-bench
+      PROPERTIES CUDA_RESOLVE_DEVICE_SYMBOLS ON
+                 CUDA_SEPARABLE_COMPILATION ON
+                 POSITION_INDEPENDENT_CODE ON)
+  else()
+    set_target_properties(fideslib-bench PROPERTIES POSITION_INDEPENDENT_CODE ON)
+    target_link_options(fideslib-bench PRIVATE -fgpu-rdc --hip-link)
+  endif()
 
 endif()

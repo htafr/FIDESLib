@@ -1,3 +1,4 @@
+#include "hip/hip_runtime.h"
 //
 // Created by carlosad on 4/12/24.
 //
@@ -87,7 +88,7 @@ void FIDESlib::CKKS::BootstrapCPUraise(Ciphertext& ctxt,
 		if constexpr (PRINT) {
 			std::cout << "Raise scaled ";
 			for (auto& j : ctxt.c0.GPU) {
-				cudaSetDevice(j.device);
+				hipSetDevice(j.device);
 				for (auto& i : j.limb) {
 					SWITCH(i, printThisLimb(1));
 				}
@@ -153,16 +154,16 @@ void FIDESlib::CKKS::BootstrapCPUraise(Ciphertext& ctxt,
 	uint64_t corFactor = (uint64_t)1 << std::llround(correction);
 	multIntScalar(ctxt, corFactor);
 	if constexpr (PRINT) {
-		cudaDeviceSynchronize();
+		hipDeviceSynchronize();
 		std::cout << "End bootstrap ";
 		for (auto& j : ctxt.c0.GPU) {
-			cudaSetDevice(j.device);
+			hipSetDevice(j.device);
 			for (auto& i : j.limb) {
 				SWITCH(i, printThisLimb(2));
 			}
 		}
 		std::cout << std::endl;
-		cudaDeviceSynchronize();
+		hipDeviceSynchronize();
 	}
 }
 
@@ -237,7 +238,7 @@ void FIDESlib::CKKS::Bootstrap(Ciphertext& ctxt, const int slots, const bool pre
 		if constexpr (PRINT) {
 			std::cout << "Raise scaled ";
 			for (auto& j : ctxt.c0.GPU) {
-				cudaSetDevice(j.device);
+				hipSetDevice(j.device);
 				for (auto& i : j.limb) {
 					SWITCH(i, printThisLimb(1));
 				}
@@ -304,16 +305,16 @@ void FIDESlib::CKKS::Bootstrap(Ciphertext& ctxt, const int slots, const bool pre
 	uint64_t corFactor = (uint64_t)1 << std::llround(correction);
 	multIntScalar(ctxt, corFactor);
 	if constexpr (PRINT) {
-		cudaDeviceSynchronize();
+		hipDeviceSynchronize();
 		std::cout << "End bootstrap ";
 		for (auto& j : ctxt.c0.GPU) {
-			cudaSetDevice(j.device);
+			hipSetDevice(j.device);
 			for (auto& i : j.limb) {
 				SWITCH(i, printThisLimb(2));
 			}
 		}
 		std::cout << std::endl;
-		cudaDeviceSynchronize();
+		hipDeviceSynchronize();
 	}
 
 	ctxt.slots = old_slots;
@@ -395,32 +396,32 @@ void FIDESlib::CKKS::ModRaise(Ciphertext& ctxt, const int slots, const uint32_t 
 	// it's being raised to.
 	// Increasing the modulus
 	if constexpr (PRINT) {
-		cudaDeviceSynchronize();
+		hipDeviceSynchronize();
 		std::cout << "Initial ";
 		for (auto& j : ctxt.c0.GPU) {
-			cudaSetDevice(j.device);
+			hipSetDevice(j.device);
 			for (auto& i : j.limb)
 				SWITCH(i, printThisLimb(1));
 		}
 		std::cout << std::endl;
-		cudaDeviceSynchronize();
+		hipDeviceSynchronize();
 		CudaCheckErrorMod;
 	}
 	if (ctxt.NoiseLevel == 2)
 		ctxt.rescale();
 	if constexpr (PRINT) {
-		cudaDeviceSynchronize();
+		hipDeviceSynchronize();
 		std::cout << "Initial 2 ";
 		CudaCheckErrorMod;
 		for (auto& j : ctxt.c0.GPU) {
-			cudaSetDevice(j.device);
+			hipSetDevice(j.device);
 			for (auto& i : j.limb)
 				SWITCH(i, printThisLimb(1));
 		}
 		std::cout << std::endl;
 		std::cout << correction << std::endl;
 		std::cout << std::pow((double)2.0, (double)-1.0 * (double)correction) << std::endl;
-		cudaDeviceSynchronize();
+		hipDeviceSynchronize();
 		CudaCheckErrorMod;
 	}
 
@@ -447,56 +448,56 @@ void FIDESlib::CKKS::ModRaise(Ciphertext& ctxt, const int slots, const uint32_t 
 
 		if (!prescaled) {
 			if constexpr (PRINT) {
-				cudaDeviceSynchronize();
+				hipDeviceSynchronize();
 				std::cout << "Initial ";
 				for (auto& j : ctxt.c0.GPU) {
-					cudaSetDevice(j.device);
+					hipSetDevice(j.device);
 					for (auto& i : j.limb)
 						SWITCH(i, printThisLimb(1));
 				}
 				std::cout << std::endl;
-				cudaDeviceSynchronize();
+				hipDeviceSynchronize();
 				CudaCheckErrorMod;
 			}
 			ctxt.multScalar(adjustmentFactor);
 			if constexpr (PRINT) {
-				cudaDeviceSynchronize();
+				hipDeviceSynchronize();
 				std::cout << "Initial ";
 				for (auto& j : ctxt.c0.GPU) {
-					cudaSetDevice(j.device);
+					hipSetDevice(j.device);
 					for (auto& i : j.limb)
 						SWITCH(i, printThisLimb(1));
 				}
 				std::cout << std::endl;
-				cudaDeviceSynchronize();
+				hipDeviceSynchronize();
 				CudaCheckErrorMod;
 			}
 			// cc->EvalMultInPlace(ciphertext, adjustmentFactor);
 			ctxt.rescale();
 			ctxt.dropToLevel(0, true);
 			if constexpr (PRINT) {
-				cudaDeviceSynchronize();
+				hipDeviceSynchronize();
 				std::cout << "Initial ";
 				for (auto& j : ctxt.c0.GPU) {
-					cudaSetDevice(j.device);
+					hipSetDevice(j.device);
 					for (auto& i : j.limb)
 						SWITCH(i, printThisLimb(1));
 				}
 				std::cout << std::endl;
-				cudaDeviceSynchronize();
+				hipDeviceSynchronize();
 				CudaCheckErrorMod;
 			}
 		} else {
 			if constexpr (PRINT) {
-				cudaDeviceSynchronize();
+				hipDeviceSynchronize();
 				std::cout << "Prescale path ";
 				for (auto& j : ctxt.c0.GPU) {
-					cudaSetDevice(j.device);
+					hipSetDevice(j.device);
 					for (auto& i : j.limb)
 						SWITCH(i, printThisLimb(1));
 				}
 				std::cout << std::endl;
-				cudaDeviceSynchronize();
+				hipDeviceSynchronize();
 				CudaCheckErrorMod;
 			}
 			if (ctxt.NoiseLevel == 2) {
@@ -512,55 +513,55 @@ void FIDESlib::CKKS::ModRaise(Ciphertext& ctxt, const int slots, const uint32_t 
 			 // This step is needed so we could use a scaling factor of up to 2^59 with q9 ~= 2^60.
 		if (!prescaled) {
 			if constexpr (PRINT) {
-				cudaDeviceSynchronize();
+				hipDeviceSynchronize();
 				std::cout << "Initial ";
 				for (auto& j : ctxt.c0.GPU) {
-					cudaSetDevice(j.device);
+					hipSetDevice(j.device);
 					for (auto& i : j.limb)
 						SWITCH(i, printThisLimb(1));
 				}
 				std::cout << std::endl;
-				cudaDeviceSynchronize();
+				hipDeviceSynchronize();
 				CudaCheckErrorMod;
 			}
 			ctxt.multScalar(std::pow((double)2.0, (double)-1.0 * (double)correction), false);
 			if constexpr (PRINT) {
-				cudaDeviceSynchronize();
+				hipDeviceSynchronize();
 				std::cout << "Initial ";
 				for (auto& j : ctxt.c0.GPU) {
-					cudaSetDevice(j.device);
+					hipSetDevice(j.device);
 					for (auto& i : j.limb)
 						SWITCH(i, printThisLimb(1));
 				}
 				std::cout << std::endl;
-				cudaDeviceSynchronize();
+				hipDeviceSynchronize();
 				CudaCheckErrorMod;
 			}
 			ctxt.rescale();
 			ctxt.dropToLevel(0);
 			if constexpr (PRINT) {
-				cudaDeviceSynchronize();
+				hipDeviceSynchronize();
 				std::cout << "Initial ";
 				for (auto& j : ctxt.c0.GPU) {
-					cudaSetDevice(j.device);
+					hipSetDevice(j.device);
 					for (auto& i : j.limb)
 						SWITCH(i, printThisLimb(1));
 				}
 				std::cout << std::endl;
-				cudaDeviceSynchronize();
+				hipDeviceSynchronize();
 				CudaCheckErrorMod;
 			}
 		} else {
 			if constexpr (PRINT) {
-				cudaDeviceSynchronize();
+				hipDeviceSynchronize();
 				std::cout << "Prescale path ";
 				for (auto& j : ctxt.c0.GPU) {
-					cudaSetDevice(j.device);
+					hipSetDevice(j.device);
 					for (auto& i : j.limb)
 						SWITCH(i, printThisLimb(1));
 				}
 				std::cout << std::endl;
-				cudaDeviceSynchronize();
+				hipDeviceSynchronize();
 				CudaCheckErrorMod;
 			}
 			if (ctxt.NoiseLevel == 2) {
@@ -590,7 +591,7 @@ void FIDESlib::CKKS::ModRaise(Ciphertext& ctxt, const int slots, const uint32_t 
 		std::cout << "Adjustment 1: ";
 		CudaCheckErrorMod;
 		for (auto& j : ctxt.c0.GPU) {
-			cudaSetDevice(j.device);
+			hipSetDevice(j.device);
 			for (auto& i : j.limb) {
 				SWITCH(i, printThisLimb(1));
 			}
@@ -604,7 +605,7 @@ void FIDESlib::CKKS::ModRaise(Ciphertext& ctxt, const int slots, const uint32_t 
 		CudaCheckErrorMod;
 		std::cout << "Adjustment ";
 		for (auto& j : ctxt.c0.GPU) {
-			cudaSetDevice(j.device);
+			hipSetDevice(j.device);
 			for (auto& i : j.limb) {
 				SWITCH(i, printThisLimb(1));
 			}
@@ -618,7 +619,7 @@ void FIDESlib::CKKS::ModRaise(Ciphertext& ctxt, const int slots, const uint32_t 
 		CudaCheckErrorMod;
 		std::cout << "Adjustment ";
 		for (auto& j : ctxt.c0.GPU) {
-			cudaSetDevice(j.device);
+			hipSetDevice(j.device);
 			for (auto& i : j.limb) {
 				SWITCH(i, printThisLimb(1));
 			}
@@ -630,7 +631,7 @@ void FIDESlib::CKKS::ModRaise(Ciphertext& ctxt, const int slots, const uint32_t 
 		CudaCheckErrorMod;
 		std::cout << "Adjustment ";
 		for (auto& j : ctxt.c0.GPU) {
-			cudaSetDevice(j.device);
+			hipSetDevice(j.device);
 			for (auto& i : j.limb) {
 				SWITCH(i, printThisLimb(1));
 			}
@@ -642,7 +643,7 @@ void FIDESlib::CKKS::ModRaise(Ciphertext& ctxt, const int slots, const uint32_t 
 	if constexpr (PRINT) {
 		std::cout << "ModRaise ";
 		for (auto& j : ctxt.c0.GPU) {
-			cudaSetDevice(j.device);
+			hipSetDevice(j.device);
 			for (auto& i : j.limb) {
 				SWITCH(i, printThisLimb(1));
 			}
@@ -653,7 +654,7 @@ void FIDESlib::CKKS::ModRaise(Ciphertext& ctxt, const int slots, const uint32_t 
 	if constexpr (PRINT) {
 		std::cout << "Adjustment c1 ";
 		for (auto& j : ctxt.c1.GPU) {
-			cudaSetDevice(j.device);
+			hipSetDevice(j.device);
 			for (auto& i : j.limb) {
 				SWITCH(i, printThisLimb(1));
 			}
@@ -666,7 +667,7 @@ void FIDESlib::CKKS::ModRaise(Ciphertext& ctxt, const int slots, const uint32_t 
 	if constexpr (PRINT) {
 		std::cout << "Adjustment c1  ";
 		for (auto& j : ctxt.c1.GPU) {
-			cudaSetDevice(j.device);
+			hipSetDevice(j.device);
 			for (auto& i : j.limb) {
 				SWITCH(i, printThisLimb(1));
 			}
@@ -677,7 +678,7 @@ void FIDESlib::CKKS::ModRaise(Ciphertext& ctxt, const int slots, const uint32_t 
 	if constexpr (PRINT) {
 		std::cout << "Adjustment c1";
 		for (auto& j : ctxt.c1.GPU) {
-			cudaSetDevice(j.device);
+			hipSetDevice(j.device);
 			for (auto& i : j.limb) {
 				SWITCH(i, printThisLimb(1));
 			}
@@ -688,7 +689,7 @@ void FIDESlib::CKKS::ModRaise(Ciphertext& ctxt, const int slots, const uint32_t 
 	if constexpr (PRINT) {
 		std::cout << "Adjustment c1";
 		for (auto& j : ctxt.c1.GPU) {
-			cudaSetDevice(j.device);
+			hipSetDevice(j.device);
 			for (auto& i : j.limb) {
 				SWITCH(i, printThisLimb(1));
 			}

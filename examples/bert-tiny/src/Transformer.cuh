@@ -29,7 +29,7 @@
 #include <string>
 #include <vector>
 
-#include <cuda_runtime.h>
+#include <hip/hip_runtime.h>
 
 using namespace lbcrypto;
 

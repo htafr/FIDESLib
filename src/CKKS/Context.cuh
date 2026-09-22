@@ -47,7 +47,7 @@ extern std::atomic_uint64_t next_uid;
 class ContextData {
   public:
 	static constexpr const char* loc{ "Context" };
-	CudaNvtxRange my_range;
+	// CudaNvtxRange my_range;
 	Parameters param;
 	Precomputations precom;
 	const int logN;

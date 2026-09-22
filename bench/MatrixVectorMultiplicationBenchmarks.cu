@@ -9,7 +9,7 @@
 namespace FIDESlib::Benchmarks {
 BENCHMARK_DEFINE_F(GeneralFixture, GPUMatVecMult)(benchmark::State& state) {
 	int devcount = -1;
-	cudaGetDeviceCount(&devcount);
+	hipGetDeviceCount(&devcount);
 
 	std::vector<int> GPUs = generalTestParams.GPUs;
 
@@ -56,7 +56,7 @@ BENCHMARK_DEFINE_F(GeneralFixture, GPUMatVecMult)(benchmark::State& state) {
 	}
 
 	for (auto _ : state) {
-		cudaDeviceSynchronize();
+		hipDeviceSynchronize();
 		auto start = std::chrono::high_resolution_clock::now();
 		GPUct[0].multPt(GPUpt[0], false);
 		for (int i = 1; i < n; ++i) {
@@ -65,7 +65,7 @@ BENCHMARK_DEFINE_F(GeneralFixture, GPUMatVecMult)(benchmark::State& state) {
 			GPUct[0].addMultPt(GPUct[i], GPUpt[i], false);
 		}
 		GPUct[0].rescale();
-		cudaDeviceSynchronize();
+		hipDeviceSynchronize();
 		auto end	 = std::chrono::high_resolution_clock::now();
 		auto elapsed = std::chrono::duration_cast<std::chrono::duration<double>>(end - start);
 		state.SetIterationTime(elapsed.count());
@@ -80,7 +80,7 @@ BENCHMARK_DEFINE_F(GeneralFixture, GPUMatVecMult)(benchmark::State& state) {
 
 BENCHMARK_DEFINE_F(GeneralFixture, GPUMatVecMultScalar)(benchmark::State& state) {
 	int devcount = -1;
-	cudaGetDeviceCount(&devcount);
+	hipGetDeviceCount(&devcount);
 
 	std::vector<int> GPUs = generalTestParams.GPUs;
 
@@ -112,7 +112,7 @@ BENCHMARK_DEFINE_F(GeneralFixture, GPUMatVecMultScalar)(benchmark::State& state)
 	}
 	CudaCheckErrorMod;
 	for (auto _ : state) {
-		cudaDeviceSynchronize();
+		hipDeviceSynchronize();
 		auto start = std::chrono::high_resolution_clock::now();
 		GPUct[0].multScalar(x[0][0], false);
 		for (int i = 1; i < 8; ++i) {
@@ -120,7 +120,7 @@ BENCHMARK_DEFINE_F(GeneralFixture, GPUMatVecMultScalar)(benchmark::State& state)
 			GPUct[0].add(GPUct[i]);
 		}
 		GPUct[0].rescale();
-		cudaDeviceSynchronize();
+		hipDeviceSynchronize();
 		auto end	 = std::chrono::high_resolution_clock::now();
 		auto elapsed = std::chrono::duration_cast<std::chrono::duration<double>>(end - start);
 		state.SetIterationTime(elapsed.count());
@@ -135,7 +135,7 @@ BENCHMARK_DEFINE_F(GeneralFixture, GPUMatVecMultScalar)(benchmark::State& state)
 
 BENCHMARK_DEFINE_F(GeneralFixture, GPUMatVecMultWSum)(benchmark::State& state) {
 	int devcount = -1;
-	cudaGetDeviceCount(&devcount);
+	hipGetDeviceCount(&devcount);
 
 	std::vector<int> GPUs = generalTestParams.GPUs;
 
@@ -172,12 +172,12 @@ BENCHMARK_DEFINE_F(GeneralFixture, GPUMatVecMultWSum)(benchmark::State& state) {
 
 	CudaCheckErrorMod;
 	for (auto _ : state) {
-		cudaDeviceSynchronize();
+		hipDeviceSynchronize();
 		auto start = std::chrono::high_resolution_clock::now();
 
 		GPUct[0]->evalLinearWSumMutable(8, GPUct, x);
 		GPUct[0]->rescale();
-		cudaDeviceSynchronize();
+		hipDeviceSynchronize();
 		auto end	 = std::chrono::high_resolution_clock::now();
 		auto elapsed = std::chrono::duration_cast<std::chrono::duration<double>>(end - start);
 		state.SetIterationTime(elapsed.count());
@@ -192,7 +192,7 @@ BENCHMARK_DEFINE_F(GeneralFixture, GPUMatVecMultWSum)(benchmark::State& state) {
 
 BENCHMARK_DEFINE_F(GeneralFixture, CPUMatVecMult)(benchmark::State& state) {
 	int devcount = -1;
-	cudaGetDeviceCount(&devcount);
+	hipGetDeviceCount(&devcount);
 
 	std::vector<int> GPUs = generalTestParams.GPUs;
 
@@ -244,7 +244,7 @@ BENCHMARK_DEFINE_F(GeneralFixture, CPUMatVecMult)(benchmark::State& state) {
 
 BENCHMARK_DEFINE_F(GeneralFixture, CPUMatVecMultScalar)(benchmark::State& state) {
 	int devcount = -1;
-	cudaGetDeviceCount(&devcount);
+	hipGetDeviceCount(&devcount);
 
 	std::vector<int> GPUs = generalTestParams.GPUs;
 

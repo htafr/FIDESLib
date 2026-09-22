@@ -1,3 +1,4 @@
+#include "hip/hip_runtime.h"
 //
 // Created by carlosad on 24/03/24.
 //
@@ -75,7 +76,7 @@ uint64_t shoup_precomp(uint64_t val, int primeid, Constants& host_constants_) {
 	do {                                 \
 		for (int j = 0; j < MAXD; ++j) { \
 			if (name[j][i] != nullptr) { \
-				cudaFree(name[j][i]);    \
+				hipFree(name[j][i]);    \
 				name[j][i] = nullptr;    \
 			}                            \
 		}                                \
@@ -115,7 +116,7 @@ Global::~Global() {
 	}
 	for (int i = 0; i < MAXD; ++i) {
 		if (this->globals[i] != nullptr) {
-			cudaFree((void*)this->globals[i]);
+			hipFree((void*)this->globals[i]);
 			globals[i] = nullptr;
 		}
 	}
@@ -141,7 +142,7 @@ std::pair<std::vector<Constants>, std::unique_ptr<Global>> SetupConstants(const 
 	Global& host_global = *host_global_;
 
 	for (int id : GPUid) {
-		cudaSetDevice(id);
+		hipSetDevice(id);
 		hC_.N	 = N;
 		hC_.logN = (int)std::bit_width((uint32_t)N) - 1;
 		hC_.L	 = q.size();
@@ -329,33 +330,33 @@ std::pair<std::vector<Constants>, std::unique_ptr<Global>> SetupConstants(const 
 	}
 
 	for (size_t i = 0; i < GPUid.size(); ++i) {
-		cudaSetDevice(GPUid.at(i));
+		hipSetDevice(GPUid.at(i));
 
 		CudaCheckErrorMod;
 		for (int j = 0; j < hC_.L + hC_.K; ++j) {
 			int bytes = hC_.N * ((HISU64(j)) ? sizeof(uint64_t) : sizeof(uint32_t));
 
-			cudaMalloc(&(hG_.psi_ptr[i][j]), bytes);
-			cudaMalloc(&(hG_.inv_psi_ptr[i][j]), bytes);
-			cudaMalloc(&(hG_.psi_no_ptr[i][j]), 2 * bytes);
-			cudaMalloc(&(hG_.inv_psi_no_ptr[i][j]), 2 * bytes);
-			cudaMalloc(&(hG_.psi_middle_scale_ptr[i][j]), bytes);
-			cudaMalloc(&(hG_.inv_psi_middle_scale_ptr[i][j]), bytes);
-			cudaMalloc(&(hG_.psi_shoup_ptr[i][j]), bytes);
-			cudaMalloc(&(hG_.inv_psi_shoup_ptr[i][j]), bytes);
+			hipMalloc(&(hG_.psi_ptr[i][j]), bytes);
+			hipMalloc(&(hG_.inv_psi_ptr[i][j]), bytes);
+			hipMalloc(&(hG_.psi_no_ptr[i][j]), 2 * bytes);
+			hipMalloc(&(hG_.inv_psi_no_ptr[i][j]), 2 * bytes);
+			hipMalloc(&(hG_.psi_middle_scale_ptr[i][j]), bytes);
+			hipMalloc(&(hG_.inv_psi_middle_scale_ptr[i][j]), bytes);
+			hipMalloc(&(hG_.psi_shoup_ptr[i][j]), bytes);
+			hipMalloc(&(hG_.inv_psi_shoup_ptr[i][j]), bytes);
 			CudaCheckErrorMod;
-			cudaMemcpy(hG_.psi_ptr[i][j], hG_.psi[j], bytes, cudaMemcpyHostToDevice);
-			cudaMemcpy(hG_.inv_psi_ptr[i][j], hG_.inv_psi[j], bytes, cudaMemcpyHostToDevice);
-			cudaMemcpy(hG_.psi_no_ptr[i][j], hG_.psi_no[j], 2 * bytes, cudaMemcpyHostToDevice);
-			cudaMemcpy(hG_.inv_psi_no_ptr[i][j], hG_.inv_psi_no[j], 2 * bytes, cudaMemcpyHostToDevice);
-			cudaMemcpy(hG_.psi_middle_scale_ptr[i][j], hG_.psi_middle_scale[j], bytes, cudaMemcpyHostToDevice);
-			cudaMemcpy(hG_.inv_psi_middle_scale_ptr[i][j], hG_.inv_psi_middle_scale[j], bytes, cudaMemcpyHostToDevice);
-			cudaMemcpy(hG_.psi_shoup_ptr[i][j], hG_.psi_shoup[j], bytes, cudaMemcpyHostToDevice);
-			cudaMemcpy(hG_.inv_psi_shoup_ptr[i][j], hG_.inv_psi_shoup[j], bytes, cudaMemcpyHostToDevice);
+			hipMemcpy(hG_.psi_ptr[i][j], hG_.psi[j], bytes, hipMemcpyHostToDevice);
+			hipMemcpy(hG_.inv_psi_ptr[i][j], hG_.inv_psi[j], bytes, hipMemcpyHostToDevice);
+			hipMemcpy(hG_.psi_no_ptr[i][j], hG_.psi_no[j], 2 * bytes, hipMemcpyHostToDevice);
+			hipMemcpy(hG_.inv_psi_no_ptr[i][j], hG_.inv_psi_no[j], 2 * bytes, hipMemcpyHostToDevice);
+			hipMemcpy(hG_.psi_middle_scale_ptr[i][j], hG_.psi_middle_scale[j], bytes, hipMemcpyHostToDevice);
+			hipMemcpy(hG_.inv_psi_middle_scale_ptr[i][j], hG_.inv_psi_middle_scale[j], bytes, hipMemcpyHostToDevice);
+			hipMemcpy(hG_.psi_shoup_ptr[i][j], hG_.psi_shoup[j], bytes, hipMemcpyHostToDevice);
+			hipMemcpy(hG_.inv_psi_shoup_ptr[i][j], hG_.inv_psi_shoup[j], bytes, hipMemcpyHostToDevice);
 			CudaCheckErrorMod;
 		}
 
-		cudaMalloc(&hG_.globals[i], sizeof(Global::Globals));
+		hipMalloc(&hG_.globals[i], sizeof(Global::Globals));
 		CudaCheckErrorMod;
 		/*
 		cudaMemcpyToSymbol(hG_.globals[i], hG_.psi_ptr[i], sizeof(hG_.globals[i]->psi), offsetof(Global::Globals, psi),
@@ -383,27 +384,27 @@ std::pair<std::vector<Constants>, std::unique_ptr<Global>> SetupConstants(const 
 						   0, cudaMemcpyHostToDevice);
 		CudaCheckErrorMod;
 		*/
-		cudaMemcpy(((char*)hG_.globals[i]) + offsetof(Global::Globals, psi), hG_.psi_ptr[i], sizeof(hG_.globals[i]->psi), cudaMemcpyHostToDevice);
+		hipMemcpy(((char*)hG_.globals[i]) + offsetof(Global::Globals, psi), hG_.psi_ptr[i], sizeof(hG_.globals[i]->psi), hipMemcpyHostToDevice);
 		CudaCheckErrorMod;
-		cudaMemcpy(((char*)hG_.globals[i]) + offsetof(Global::Globals, psi_no), hG_.psi_no_ptr[i], sizeof(hG_.globals[i]->psi_no), cudaMemcpyHostToDevice);
+		hipMemcpy(((char*)hG_.globals[i]) + offsetof(Global::Globals, psi_no), hG_.psi_no_ptr[i], sizeof(hG_.globals[i]->psi_no), hipMemcpyHostToDevice);
 		CudaCheckErrorMod;
-		cudaMemcpy(((char*)hG_.globals[i]) + offsetof(Global::Globals, psi_middle_scale), hG_.psi_middle_scale_ptr[i], sizeof(hG_.globals[i]->psi_middle_scale), cudaMemcpyHostToDevice);
+		hipMemcpy(((char*)hG_.globals[i]) + offsetof(Global::Globals, psi_middle_scale), hG_.psi_middle_scale_ptr[i], sizeof(hG_.globals[i]->psi_middle_scale), hipMemcpyHostToDevice);
 		CudaCheckErrorMod;
-		cudaMemcpy(((char*)hG_.globals[i]) + offsetof(Global::Globals, inv_psi), hG_.inv_psi_ptr[i], sizeof(hG_.globals[i]->inv_psi), cudaMemcpyHostToDevice);
+		hipMemcpy(((char*)hG_.globals[i]) + offsetof(Global::Globals, inv_psi), hG_.inv_psi_ptr[i], sizeof(hG_.globals[i]->inv_psi), hipMemcpyHostToDevice);
 
 		CudaCheckErrorMod;
-		cudaMemcpy(((char*)hG_.globals[i]) + offsetof(Global::Globals, inv_psi_no), hG_.inv_psi_no_ptr[i], sizeof(hG_.globals[i]->inv_psi_no), cudaMemcpyHostToDevice);
+		hipMemcpy(((char*)hG_.globals[i]) + offsetof(Global::Globals, inv_psi_no), hG_.inv_psi_no_ptr[i], sizeof(hG_.globals[i]->inv_psi_no), hipMemcpyHostToDevice);
 		CudaCheckErrorMod;
 
-		cudaMemcpy(((char*)hG_.globals[i]) + offsetof(Global::Globals, inv_psi_middle_scale),
+		hipMemcpy(((char*)hG_.globals[i]) + offsetof(Global::Globals, inv_psi_middle_scale),
 		  hG_.inv_psi_middle_scale_ptr[i],
 		  sizeof(hG_.globals[i]->inv_psi_middle_scale),
-		  cudaMemcpyHostToDevice);
+		  hipMemcpyHostToDevice);
 
 		CudaCheckErrorMod;
-		cudaMemcpy(((char*)hG_.globals[i]) + offsetof(Global::Globals, psi_shoup), hG_.psi_shoup_ptr[i], sizeof(hG_.globals[i]->psi_shoup), cudaMemcpyHostToDevice);
+		hipMemcpy(((char*)hG_.globals[i]) + offsetof(Global::Globals, psi_shoup), hG_.psi_shoup_ptr[i], sizeof(hG_.globals[i]->psi_shoup), hipMemcpyHostToDevice);
 		CudaCheckErrorMod;
-		cudaMemcpy(((char*)hG_.globals[i]) + offsetof(Global::Globals, inv_psi_shoup), hG_.inv_psi_shoup_ptr[i], sizeof(hG_.globals[i]->inv_psi_shoup), cudaMemcpyHostToDevice);
+		hipMemcpy(((char*)hG_.globals[i]) + offsetof(Global::Globals, inv_psi_shoup), hG_.inv_psi_shoup_ptr[i], sizeof(hG_.globals[i]->inv_psi_shoup), hipMemcpyHostToDevice);
 		CudaCheckErrorMod;
 	}
 
@@ -424,9 +425,9 @@ std::pair<std::vector<Constants>, std::unique_ptr<Global>> SetupConstants(const 
 		constexpr int bytes = sizeof(Global::q_inv);
 
 		for (uint32_t i = 0; i < GPUid.size(); ++i) {
-			cudaSetDevice(GPUid[i]);
+			hipSetDevice(GPUid[i]);
 			// cudaMemcpyToSymbol(hG_.globals[i].q_inv, hG_.q_inv, bytes, 0, cudaMemcpyHostToDevice);
-			cudaMemcpy(((char*)hG_.globals[i]) + offsetof(Global::Globals, q_inv), hG_.q_inv, bytes, cudaMemcpyHostToDevice);
+			hipMemcpy(((char*)hG_.globals[i]) + offsetof(Global::Globals, q_inv), hG_.q_inv, bytes, hipMemcpyHostToDevice);
 			CudaCheckErrorMod;
 		}
 	}
@@ -451,10 +452,10 @@ std::pair<std::vector<Constants>, std::unique_ptr<Global>> SetupConstants(const 
 				constexpr int bytes = sizeof(Global::QlQlInvModqlDivqlModq);
 
 				for (uint32_t i = 0; i < GPUid.size(); ++i) {
-					cudaSetDevice(GPUid[i]);
+					hipSetDevice(GPUid[i]);
 					// cudaMemcpyToSymbol(hG_.globals[i].QlQlInvModqlDivqlModq, hG_.QlQlInvModqlDivqlModq, bytes, 0,
 					//                    cudaMemcpyHostToDevice);
-					cudaMemcpy(((char*)hG_.globals[i]) + offsetof(Global::Globals, QlQlInvModqlDivqlModq), hG_.QlQlInvModqlDivqlModq, bytes, cudaMemcpyHostToDevice);
+					hipMemcpy(((char*)hG_.globals[i]) + offsetof(Global::Globals, QlQlInvModqlDivqlModq), hG_.QlQlInvModqlDivqlModq, bytes, hipMemcpyHostToDevice);
 					CudaCheckErrorMod;
 				}
 			}
@@ -482,15 +483,15 @@ std::pair<std::vector<Constants>, std::unique_ptr<Global>> SetupConstants(const 
 
 				constexpr int bytes = sizeof(Global::ModDown_pre_scale);
 				for (uint32_t i = 0; i < GPUid.size(); ++i) {
-					cudaSetDevice(GPUid[i]);
+					hipSetDevice(GPUid[i]);
 					/*
 					cudaMemcpyToSymbol(hG_.globals[i].ModDown_pre_scale, hG_.ModDown_pre_scale, bytes, 0,
 									   cudaMemcpyHostToDevice);
 					cudaMemcpyToSymbol(hG_.globals[i].ModDown_pre_scale_shoup, hG_.ModDown_pre_scale_shoup, bytes, 0,
 									   cudaMemcpyHostToDevice);
 									   */
-					cudaMemcpy(((char*)hG_.globals[i]) + offsetof(Global::Globals, ModDown_pre_scale), hG_.ModDown_pre_scale, bytes, cudaMemcpyHostToDevice);
-					cudaMemcpy(((char*)hG_.globals[i]) + offsetof(Global::Globals, ModDown_pre_scale_shoup), hG_.ModDown_pre_scale_shoup, bytes, cudaMemcpyHostToDevice);
+					hipMemcpy(((char*)hG_.globals[i]) + offsetof(Global::Globals, ModDown_pre_scale), hG_.ModDown_pre_scale, bytes, hipMemcpyHostToDevice);
+					hipMemcpy(((char*)hG_.globals[i]) + offsetof(Global::Globals, ModDown_pre_scale_shoup), hG_.ModDown_pre_scale_shoup, bytes, hipMemcpyHostToDevice);
 					CudaCheckErrorMod;
 				}
 			}
@@ -507,15 +508,15 @@ std::pair<std::vector<Constants>, std::unique_ptr<Global>> SetupConstants(const 
 
 				constexpr int bytes = sizeof(Global::ModDown_matrix);
 				for (uint32_t i = 0; i < GPUid.size(); ++i) {
-					cudaSetDevice(GPUid[i]);
+					hipSetDevice(GPUid[i]);
 					/*
 					cudaMemcpyToSymbol(hG_.globals[i].ModDown_matrix, hG_.ModDown_matrix, bytes, 0,
 									   cudaMemcpyHostToDevice);
 					cudaMemcpyToSymbol(hG_.globals[i].ModDown_matrix_shoup, hG_.ModDown_matrix_shoup, bytes, 0,
 									   cudaMemcpyHostToDevice);
 									   */
-					cudaMemcpy(((char*)hG_.globals[i]) + offsetof(Global::Globals, ModDown_matrix), hG_.ModDown_matrix, bytes, cudaMemcpyHostToDevice);
-					cudaMemcpy(((char*)hG_.globals[i]) + offsetof(Global::Globals, ModDown_matrix_shoup), hG_.ModDown_matrix_shoup, bytes, cudaMemcpyHostToDevice);
+					hipMemcpy(((char*)hG_.globals[i]) + offsetof(Global::Globals, ModDown_matrix), hG_.ModDown_matrix, bytes, hipMemcpyHostToDevice);
+					hipMemcpy(((char*)hG_.globals[i]) + offsetof(Global::Globals, ModDown_matrix_shoup), hG_.ModDown_matrix_shoup, bytes, hipMemcpyHostToDevice);
 					CudaCheckErrorMod;
 				}
 			}
@@ -538,15 +539,15 @@ std::pair<std::vector<Constants>, std::unique_ptr<Global>> SetupConstants(const 
 				constexpr int bytes = sizeof(Global::DecompAndModUp_pre_scale);
 				assert(bytes == 8 * 64 * 64 * 8);
 				for (uint32_t i = 0; i < GPUid.size(); ++i) {
-					cudaSetDevice(GPUid[i]);
+					hipSetDevice(GPUid[i]);
 					/*
 					cudaMemcpyToSymbol(hG_.globals[i].DecompAndModUp_pre_scale, hG_.DecompAndModUp_pre_scale, bytes, 0,
 									   cudaMemcpyHostToDevice);
 					cudaMemcpyToSymbol(hG_.globals[i].DecompAndModUp_pre_scale_shoup,
 									   hG_.DecompAndModUp_pre_scale_shoup, bytes, 0, cudaMemcpyHostToDevice);
 									   */
-					cudaMemcpy(((char*)hG_.globals[i]) + offsetof(Global::Globals, DecompAndModUp_pre_scale), hG_.DecompAndModUp_pre_scale, bytes, cudaMemcpyHostToDevice);
-					cudaMemcpy(((char*)hG_.globals[i]) + offsetof(Global::Globals, DecompAndModUp_pre_scale_shoup), hG_.DecompAndModUp_pre_scale_shoup, bytes, cudaMemcpyHostToDevice);
+					hipMemcpy(((char*)hG_.globals[i]) + offsetof(Global::Globals, DecompAndModUp_pre_scale), hG_.DecompAndModUp_pre_scale, bytes, hipMemcpyHostToDevice);
+					hipMemcpy(((char*)hG_.globals[i]) + offsetof(Global::Globals, DecompAndModUp_pre_scale_shoup), hG_.DecompAndModUp_pre_scale_shoup, bytes, hipMemcpyHostToDevice);
 					CudaCheckErrorMod;
 				}
 			}
@@ -596,15 +597,15 @@ std::pair<std::vector<Constants>, std::unique_ptr<Global>> SetupConstants(const 
 				constexpr int bytes = sizeof(Global::DecompAndModUp_matrix);
 				assert(bytes == MAXP * MAXP * MAXP * MAXD /** MAXD*/);
 				for (uint32_t i = 0; i < GPUid.size(); ++i) {
-					cudaSetDevice(GPUid[i]);
+					hipSetDevice(GPUid[i]);
 					/*
 					cudaMemcpyToSymbol(hG_.globals[i].DecompAndModUp_matrix, hG_.DecompAndModUp_matrix, bytes, 0,
 									   cudaMemcpyHostToDevice);
 					cudaMemcpyToSymbol(hG_.globals[i].DecompAndModUp_matrix_shoup, hG_.DecompAndModUp_matrix_shoup,
 									   bytes, 0, cudaMemcpyHostToDevice);
 									   */
-					cudaMemcpy(((char*)hG_.globals[i]) + offsetof(Global::Globals, DecompAndModUp_matrix), hG_.DecompAndModUp_matrix, bytes, cudaMemcpyHostToDevice);
-					cudaMemcpy(((char*)hG_.globals[i]) + offsetof(Global::Globals, DecompAndModUp_matrix_shoup), hG_.DecompAndModUp_matrix_shoup, bytes, cudaMemcpyHostToDevice);
+					hipMemcpy(((char*)hG_.globals[i]) + offsetof(Global::Globals, DecompAndModUp_matrix), hG_.DecompAndModUp_matrix, bytes, hipMemcpyHostToDevice);
+					hipMemcpy(((char*)hG_.globals[i]) + offsetof(Global::Globals, DecompAndModUp_matrix_shoup), hG_.DecompAndModUp_matrix_shoup, bytes, hipMemcpyHostToDevice);
 					CudaCheckErrorMod;
 					/*
 					cudaMemcpyFromSymbol(hG_.DecompAndModUp_matrix, hG_.globals[i].DecompAndModUp_matrix, bytes, 0,
@@ -663,8 +664,8 @@ std::pair<std::vector<Constants>, std::unique_ptr<Global>> SetupConstants(const 
 			}
 		}
 
-		cudaSetDevice(GPUid[i]);
-		cudaMemcpyToSymbol(constants, &host_constants, sizeof(Constants), 0, cudaMemcpyHostToDevice);
+		hipSetDevice(GPUid[i]);
+		hipMemcpyToSymbol(HIP_SYMBOL(constants), &host_constants, sizeof(Constants), 0, hipMemcpyHostToDevice);
 		CudaCheckErrorMod;
 		host_constants_per_gpu[i] = host_constants;
 	}

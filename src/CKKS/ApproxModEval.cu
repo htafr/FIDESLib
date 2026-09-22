@@ -1,3 +1,4 @@
+#include "hip/hip_runtime.h"
 //
 // Created by carlosad on 12/11/24.
 //
@@ -37,14 +38,14 @@ void FIDESlib::CKKS::approxModReduction(Ciphertext& ctxtEnc, Ciphertext& ctxtEnc
 	if constexpr (PRINT) {
 		std::cout << "ctxtEnc res " << ctxtEnc.getLevel() << " " << ctxtEnc.NoiseLevel << std::endl;
 		for (auto& i : ctxtEnc.c0.GPU.at(0).limb) {
-			cudaSetDevice(ctxtEnc.c0.GPU.at(0).device);
+			hipSetDevice(ctxtEnc.c0.GPU.at(0).device);
 			SWITCH(i, printThisLimb(1));
 		}
 		std::cout << std::endl;
 
 		std::cout << "ctxtEncI res " << ctxtEncI.getLevel() << " " << ctxtEncI.NoiseLevel << std::endl;
 		for (auto& i : ctxtEncI.c0.GPU.at(0).limb) {
-			cudaSetDevice(ctxtEncI.c0.GPU.at(0).device);
+			hipSetDevice(ctxtEncI.c0.GPU.at(0).device);
 			SWITCH(i, printThisLimb(1));
 		}
 		std::cout << std::endl;
@@ -56,14 +57,14 @@ void FIDESlib::CKKS::approxModReduction(Ciphertext& ctxtEnc, Ciphertext& ctxtEnc
 	if constexpr (PRINT) {
 		std::cout << "ctxtEnc DA res " << ctxtEnc.getLevel() << " " << ctxtEnc.NoiseLevel << std::endl;
 		for (auto& i : ctxtEnc.c0.GPU.at(0).limb) {
-			cudaSetDevice(ctxtEnc.c0.GPU.at(0).device);
+			hipSetDevice(ctxtEnc.c0.GPU.at(0).device);
 			SWITCH(i, printThisLimb(1));
 		}
 		std::cout << std::endl;
 
 		std::cout << "ctxtEncI DA res " << ctxtEncI.getLevel() << " " << ctxtEncI.NoiseLevel << std::endl;
 		for (auto& i : ctxtEncI.c0.GPU.at(0).limb) {
-			cudaSetDevice(ctxtEncI.c0.GPU.at(0).device);
+			hipSetDevice(ctxtEncI.c0.GPU.at(0).device);
 			SWITCH(i, printThisLimb(1));
 		}
 		std::cout << std::endl;
@@ -84,7 +85,7 @@ void FIDESlib::CKKS::approxModReduction(Ciphertext& ctxtEnc, Ciphertext& ctxtEnc
 	if constexpr (PRINT) {
 		std::cout << "ctxtEnc final res " << ctxtEnc.getLevel() << " " << ctxtEnc.NoiseLevel << std::endl;
 		for (auto& i : ctxtEnc.c0.GPU.at(0).limb) {
-			cudaSetDevice(ctxtEnc.c0.GPU.at(0).device);
+			hipSetDevice(ctxtEnc.c0.GPU.at(0).device);
 			SWITCH(i, printThisLimb(1));
 		}
 		std::cout << std::endl;
@@ -102,7 +103,7 @@ void FIDESlib::CKKS::approxModReductionSparse(Ciphertext& ctxtEnc, uint64_t post
 	if constexpr (PRINT) {
 		std::cout << "ctxtEnc res " << ctxtEnc.getLevel() << " " << ctxtEnc.NoiseLevel << std::endl;
 		for (auto& i : ctxtEnc.c0.GPU.at(0).limb) {
-			cudaSetDevice(ctxtEnc.c0.GPU.at(0).device);
+			hipSetDevice(ctxtEnc.c0.GPU.at(0).device);
 			SWITCH(i, printThisLimb(1));
 		}
 		std::cout << std::endl;
@@ -111,7 +112,7 @@ void FIDESlib::CKKS::approxModReductionSparse(Ciphertext& ctxtEnc, uint64_t post
 	if constexpr (PRINT) {
 		std::cout << "ctxtEnc DA " << ctxtEnc.getLevel() << " " << ctxtEnc.NoiseLevel << std::endl;
 		for (auto& i : ctxtEnc.c0.GPU.at(0).limb) {
-			cudaSetDevice(ctxtEnc.c0.GPU.at(0).device);
+			hipSetDevice(ctxtEnc.c0.GPU.at(0).device);
 			SWITCH(i, printThisLimb(1));
 		}
 		std::cout << std::endl;
@@ -120,7 +121,7 @@ void FIDESlib::CKKS::approxModReductionSparse(Ciphertext& ctxtEnc, uint64_t post
 	if constexpr (PRINT) {
 		std::cout << "ctxtEnc final " << ctxtEnc.getLevel() << " " << ctxtEnc.NoiseLevel << std::endl;
 		for (auto& i : ctxtEnc.c0.GPU.at(0).limb) {
-			cudaSetDevice(ctxtEnc.c0.GPU.at(0).device);
+			hipSetDevice(ctxtEnc.c0.GPU.at(0).device);
 			SWITCH(i, printThisLimb(1));
 		}
 		std::cout << std::endl;
@@ -483,7 +484,7 @@ const std::vector<double>& coefficients, double a, double b) const {
 	for (uint32_t i = 2; i <= k; i++) {
 		// if i is a power of two
 		if constexpr (sync)
-			cudaDeviceSynchronize();
+			hipDeviceSynchronize();
 
 		if (i % 2 == 1) {
 			// if i is odd
@@ -513,7 +514,7 @@ const std::vector<double>& coefficients, double a, double b) const {
 		for (size_t j = 0; j < k; ++j) {
 			std::cout << "T[" << j << "]: " << std::endl;
 			for (auto& i : T[j]->c0.GPU.at(0).limb) {
-				cudaSetDevice(T[j]->c0.GPU.at(0).device);
+				hipSetDevice(T[j]->c0.GPU.at(0).device);
 				SWITCH(i, printThisLimb(1));
 			}
 			std::cout << std::endl;
@@ -618,14 +619,14 @@ const std::vector<double>& coefficients, double a, double b) const {
 			std::cout << "T2[" << j << "]: " << std::endl;
 
 			for (auto& i : T2[j]->c0.GPU.at(0).limb) {
-				cudaSetDevice(T2[j]->c0.GPU.at(0).device);
+				hipSetDevice(T2[j]->c0.GPU.at(0).device);
 				SWITCH(i, printThisLimb(1));
 			}
 			std::cout << std::endl;
 		}
 	}
 	if constexpr (sync)
-		cudaDeviceSynchronize();
+		hipDeviceSynchronize();
 	/*
 	std::vector<Ciphertext<DCRTPoly>> T2(m);
 	// Compute the Chebyshev polynomials T_k(y), T_{2k}(y), T_{4k}(y), ... , T_{2^{m-1}k}(y)
@@ -665,12 +666,12 @@ const std::vector<double>& coefficients, double a, double b) const {
 			T2km1.rescale();
 
 		if constexpr (sync)
-			cudaDeviceSynchronize();
+			hipDeviceSynchronize();
 	}
 	if constexpr (PRINT) {
 		std::cout << "T2kmi cheby " << T2km1.getLevel() << " " << T2km1.NoiseLevel << std::endl;
 		for (auto& i : T2km1.c0.GPU.at(0).limb) {
-			cudaSetDevice(T2km1.c0.GPU.at(0).device);
+			hipSetDevice(T2km1.c0.GPU.at(0).device);
 			SWITCH(i, printThisLimb(1));
 		}
 		std::cout << std::endl;
@@ -717,7 +718,7 @@ const std::vector<double>& coefficients, double a, double b) const {
 	return result;
 	*/
 	if constexpr (sync)
-		cudaDeviceSynchronize();
+		hipDeviceSynchronize();
 }
 
 void applyDoubleAngleIterations(Ciphertext& ctxt, int its, const KeySwitchingKey& kskEval) {

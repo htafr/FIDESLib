@@ -20,7 +20,7 @@ class LimbKernelTest32 : public FIDESlibParametrizedTest {};
 
 TEST_P(LimbKernelTest, AllLimbKernel32) {
 	int devcount = -1;
-	cudaGetDeviceCount(&devcount);
+	hipGetDeviceCount(&devcount);
 
 	std::vector<int> GPUs = devices;
 
@@ -29,7 +29,7 @@ TEST_P(LimbKernelTest, AllLimbKernel32) {
 	CudaCheckErrorMod;
 
 	for (int l : { 0 }) {
-		cudaSetDevice(GPUs[0]);
+		hipSetDevice(GPUs[0]);
 		FIDESlib::Stream s;
 		s.init();
 
@@ -73,7 +73,7 @@ TEST_P(LimbKernelTest, AllLimbKernel32) {
 
 TEST_P(LimbKernelTest, AllLimbKernel64) {
 	int devcount = -1;
-	cudaGetDeviceCount(&devcount);
+	hipGetDeviceCount(&devcount);
 
 	std::vector<int> GPUs = devices;
 
@@ -82,7 +82,7 @@ TEST_P(LimbKernelTest, AllLimbKernel64) {
 	CudaCheckErrorMod;
 
 	for (int l : { 0 }) {
-		cudaSetDevice(GPUs[0]);
+		hipSetDevice(GPUs[0]);
 		FIDESlib::Stream s;
 		s.init();
 
@@ -126,7 +126,7 @@ TEST_P(LimbKernelTest, AllLimbKernel64) {
 
 TEST_P(LimbKernelTest, TestMultKernel64) {
 	int devcount = -1;
-	cudaGetDeviceCount(&devcount);
+	hipGetDeviceCount(&devcount);
 
 	std::vector<int> GPUs = devices;
 
@@ -138,7 +138,7 @@ TEST_P(LimbKernelTest, TestMultKernel64) {
 
 	for (int i = 0; i <= cc.L + cc.K; ++i)
 		for (int l : { 0 }) {
-			cudaSetDevice(GPUs[0]);
+			hipSetDevice(GPUs[0]);
 			FIDESlib::Stream s;
 			s.init();
 
@@ -162,7 +162,7 @@ TEST_P(LimbKernelTest, TestMultKernel64) {
 
 				limb.store(v);
 
-				cudaDeviceSynchronize();
+				hipDeviceSynchronize();
 				CudaCheckErrorMod;
 				for (int i = 0; i < cc.N; ++i)
 					if (v[i] != v3[i])
@@ -177,7 +177,7 @@ TEST_P(LimbKernelTest, TestMultKernel64) {
 
 TEST_P(LimbKernelTest, TestBetterBarretMultKernel64) {
 	int devcount = -1;
-	cudaGetDeviceCount(&devcount);
+	hipGetDeviceCount(&devcount);
 
 	std::vector<int> GPUs;
 	for (int i = 0; i < devcount; ++i)
@@ -191,7 +191,7 @@ TEST_P(LimbKernelTest, TestBetterBarretMultKernel64) {
 
 	for (int its = 0; its < 10; ++its) {
 		for (int i = 0; i <= cc.L + cc.K; ++i) {
-			cudaSetDevice(GPUs[0]);
+			hipSetDevice(GPUs[0]);
 			FIDESlib::Stream s;
 			s.init();
 
@@ -215,7 +215,7 @@ TEST_P(LimbKernelTest, TestBetterBarretMultKernel64) {
 
 				limb.store(v);
 				FIDESlib::CudaHostSync();
-				cudaDeviceSynchronize();
+				hipDeviceSynchronize();
 				CudaCheckErrorMod;
 				for (int k = 0; k < cc.N; ++k)
 					if (v[k] != v3[k]) {
@@ -230,7 +230,7 @@ TEST_P(LimbKernelTest, TestBetterBarretMultKernel64) {
 
 TEST_P(LimbKernelTest, Test53bitFp64debMultKernel64) {
 	int devcount = -1;
-	cudaGetDeviceCount(&devcount);
+	hipGetDeviceCount(&devcount);
 
 	std::vector<int> GPUs;
 	for (int i = 0; i < devcount; ++i)
@@ -247,7 +247,7 @@ TEST_P(LimbKernelTest, Test53bitFp64debMultKernel64) {
 			if (hC_.prime_bits[i] >= 53 - 1)
 				continue;
 
-			cudaSetDevice(GPUs[0]);
+			hipSetDevice(GPUs[0]);
 			FIDESlib::Stream s;
 			s.init();
 
@@ -271,7 +271,7 @@ TEST_P(LimbKernelTest, Test53bitFp64debMultKernel64) {
 
 				limb.store(v);
 				FIDESlib::CudaHostSync();
-				cudaDeviceSynchronize();
+				hipDeviceSynchronize();
 				CudaCheckErrorMod;
 				for (int k = 0; k < cc.N; ++k)
 					if (v[k] != v3[k]) {
@@ -286,7 +286,7 @@ TEST_P(LimbKernelTest, Test53bitFp64debMultKernel64) {
 
 TEST_P(LimbKernelTest, TestBarretPsiKernel64) {
 	int devcount = -1;
-	cudaGetDeviceCount(&devcount);
+	hipGetDeviceCount(&devcount);
 
 	std::vector<int> GPUs;
 	for (int i = 0; i < devcount; ++i)
@@ -303,7 +303,7 @@ TEST_P(LimbKernelTest, TestBarretPsiKernel64) {
 			if (hC_.prime_bits[i] >= 53 - 1)
 				continue;
 
-			cudaSetDevice(GPUs[0]);
+			hipSetDevice(GPUs[0]);
 			FIDESlib::Stream s;
 			s.init();
 
@@ -326,7 +326,7 @@ TEST_P(LimbKernelTest, TestBarretPsiKernel64) {
 
 				limb.store(v);
 				FIDESlib::CudaHostSync();
-				cudaDeviceSynchronize();
+				hipDeviceSynchronize();
 				CudaCheckErrorMod;
 				for (int k = 0; k < cc.N; ++k)
 					if (v[k] != v3[k]) {
@@ -341,7 +341,7 @@ TEST_P(LimbKernelTest, TestBarretPsiKernel64) {
 
 TEST_P(LimbKernelTest32, TestMultKernel32) {
 	int devcount = -1;
-	cudaGetDeviceCount(&devcount);
+	hipGetDeviceCount(&devcount);
 
 	std::vector<int> GPUs;
 	for (int i = 0; i < devcount; ++i)
@@ -357,7 +357,7 @@ TEST_P(LimbKernelTest32, TestMultKernel32) {
 	std::iota(limbs.begin(), limbs.end(), 0);
 
 	std::for_each(limbs.begin(), limbs.end(), [&](int i) {
-		cudaSetDevice(GPUs[0]);
+		hipSetDevice(GPUs[0]);
 		FIDESlib::Stream s;
 		s.init();
 
@@ -400,7 +400,7 @@ TEST_P(LimbKernelTest32, TestMultKernel32) {
 
 TEST_P(LimbKernelTest32, TestBetterBarretMultKernel32) {
 	int devcount = -1;
-	cudaGetDeviceCount(&devcount);
+	hipGetDeviceCount(&devcount);
 
 	std::vector<int> GPUs;
 	for (int i = 0; i < devcount; ++i)
@@ -414,7 +414,7 @@ TEST_P(LimbKernelTest32, TestBetterBarretMultKernel32) {
 
 	for (int i = 0; i <= cc.L + cc.K; ++i)
 		for (int l : { 0 }) {
-			cudaSetDevice(GPUs[0]);
+			hipSetDevice(GPUs[0]);
 			FIDESlib::Stream s;
 			s.init();
 
@@ -438,7 +438,7 @@ TEST_P(LimbKernelTest32, TestBetterBarretMultKernel32) {
 
 				limb.store(v);
 				FIDESlib::CudaHostSync();
-				cudaDeviceSynchronize();
+				hipDeviceSynchronize();
 				CudaCheckErrorMod;
 				for (int k = 0; k < cc.N; ++k)
 					if (v[k] != v3[k]) {

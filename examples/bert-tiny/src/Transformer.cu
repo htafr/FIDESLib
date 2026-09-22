@@ -18,7 +18,7 @@ std::vector<std::vector<FIDESlib::CKKS::Ciphertext>> encoder(PtWeights_GPU& weig
 	std::chrono::time_point<std::chrono::system_clock> start_gpu, end_gpu;
 
 	if (TIMING) {
-		cudaDeviceSynchronize();
+		hipDeviceSynchronize();
 		start_gpu = std::chrono::high_resolution_clock::now();
 	}
 	Context& cc = tokens[0][0].cc_;
@@ -34,7 +34,7 @@ std::vector<std::vector<FIDESlib::CKKS::Ciphertext>> encoder(PtWeights_GPU& weig
 	PCMM_GPU(tokens, weights_layer.Wv, conf.blockSize, V, precomp_gpu, weights_layer.bv, masks.row_masks[conf.token_length]);
 
 	if (TIMING) {
-		cudaDeviceSynchronize();
+		hipDeviceSynchronize();
 		end_gpu = std::chrono::high_resolution_clock::now();
 		std::cout << "PCMM took: " << (std::chrono::duration_cast<std::chrono::milliseconds>(end_gpu - start_gpu).count()) << " ms." << std::endl;
 		start_gpu = std::chrono::high_resolution_clock::now();
@@ -79,7 +79,7 @@ std::vector<std::vector<FIDESlib::CKKS::Ciphertext>> encoder(PtWeights_GPU& weig
 		printMatrix(decryptGPUMatrix(QKT2, keys_.secretKey, ct_tokens, conf.numSlots, conf.blockSize), 2, 2, "QKT2: ", false);
 
 	if (TIMING) {
-		cudaDeviceSynchronize();
+		hipDeviceSynchronize();
 		end_gpu = std::chrono::high_resolution_clock::now();
 		std::cout << "CCMM took: " << (std::chrono::duration_cast<std::chrono::milliseconds>(end_gpu - start_gpu).count()) << " ms." << std::endl;
 		start_gpu = std::chrono::high_resolution_clock::now();
@@ -150,7 +150,7 @@ std::vector<std::vector<FIDESlib::CKKS::Ciphertext>> encoder(PtWeights_GPU& weig
 	QKT2 = MatrixMask(QKT2, double_mask);
 
 	if (TIMING) {
-		cudaDeviceSynchronize();
+		hipDeviceSynchronize();
 		end_gpu = std::chrono::high_resolution_clock::now();
 		std::cout << "Softmax took: " << (std::chrono::duration_cast<std::chrono::milliseconds>(end_gpu - start_gpu).count()) << " ms." << std::endl;
 		start_gpu = std::chrono::high_resolution_clock::now();
@@ -189,7 +189,7 @@ std::vector<std::vector<FIDESlib::CKKS::Ciphertext>> encoder(PtWeights_GPU& weig
 		printMatrix(decryptGPUMatrix(Sm_V, keys_.secretKey, ct_tokens, conf.numSlots, conf.blockSize), 2, 2, "Sm_V: ", false);
 
 	if (TIMING) {
-		cudaDeviceSynchronize();
+		hipDeviceSynchronize();
 		end_gpu = std::chrono::high_resolution_clock::now();
 		std::cout << "CCMM took: " << (std::chrono::duration_cast<std::chrono::milliseconds>(end_gpu - start_gpu).count()) << " ms." << std::endl;
 		start_gpu = std::chrono::high_resolution_clock::now();
@@ -207,7 +207,7 @@ std::vector<std::vector<FIDESlib::CKKS::Ciphertext>> encoder(PtWeights_GPU& weig
 		printMatrix(decryptGPUMatrix(Sm_V, keys_.secretKey, ct_tokens, conf.numSlots, conf.blockSize), 2, 2, "Sm_V: ", false);
 
 	if (TIMING) {
-		cudaDeviceSynchronize();
+		hipDeviceSynchronize();
 		end_gpu = std::chrono::high_resolution_clock::now();
 		std::cout << "Boot took: " << (std::chrono::duration_cast<std::chrono::milliseconds>(end_gpu - start_gpu).count()) << " ms." << std::endl;
 		start_gpu = std::chrono::high_resolution_clock::now();
@@ -219,7 +219,7 @@ std::vector<std::vector<FIDESlib::CKKS::Ciphertext>> encoder(PtWeights_GPU& weig
 		printMatrix(decryptGPUMatrix(GPUResult_Output, keys_.secretKey, ct_tokens, conf.numSlots, conf.blockSize), 2, 2, "Result_output: ", false);
 
 	if (TIMING) {
-		cudaDeviceSynchronize();
+		hipDeviceSynchronize();
 		end_gpu = std::chrono::high_resolution_clock::now();
 		std::cout << "PCMM took: " << (std::chrono::duration_cast<std::chrono::milliseconds>(end_gpu - start_gpu).count()) << " ms." << std::endl;
 		start_gpu = std::chrono::high_resolution_clock::now();
@@ -248,7 +248,7 @@ std::vector<std::vector<FIDESlib::CKKS::Ciphertext>> encoder(PtWeights_GPU& weig
 		printMatrix(decryptGPUMatrix(GPUResult_Output, keys_.secretKey, ct_tokens, conf.numSlots, conf.blockSize), 2, 2, "LN: ", false);
 
 	if (TIMING) {
-		cudaDeviceSynchronize();
+		hipDeviceSynchronize();
 		end_gpu = std::chrono::high_resolution_clock::now();
 		std::cout << "LN took: " << (std::chrono::duration_cast<std::chrono::milliseconds>(end_gpu - start_gpu).count()) << " ms." << std::endl;
 		start_gpu = std::chrono::high_resolution_clock::now();
@@ -258,7 +258,7 @@ std::vector<std::vector<FIDESlib::CKKS::Ciphertext>> encoder(PtWeights_GPU& weig
 	PCMM_GPU(GPUResult_Output, weights_layer.Wu, conf.blockSize, GPUResult_Up, precomp_gpu, weights_layer.bu, masks.row_masks[conf.token_length]);
 
 	if (TIMING) {
-		cudaDeviceSynchronize();
+		hipDeviceSynchronize();
 		end_gpu = std::chrono::high_resolution_clock::now();
 		std::cout << "PCMM took: " << (std::chrono::duration_cast<std::chrono::milliseconds>(end_gpu - start_gpu).count()) << " ms." << std::endl;
 		start_gpu = std::chrono::high_resolution_clock::now();
@@ -276,7 +276,7 @@ std::vector<std::vector<FIDESlib::CKKS::Ciphertext>> encoder(PtWeights_GPU& weig
 		printMatrix(decryptGPUMatrix(GPUResult_Up, keys_.secretKey, ct_tokens, conf.numSlots, conf.blockSize), 2, 2, "RELU: ", false);
 
 	if (TIMING) {
-		cudaDeviceSynchronize();
+		hipDeviceSynchronize();
 		end_gpu = std::chrono::high_resolution_clock::now();
 		std::cout << "Gelu took: " << (std::chrono::duration_cast<std::chrono::milliseconds>(end_gpu - start_gpu).count()) << " ms." << std::endl;
 		start_gpu = std::chrono::high_resolution_clock::now();
@@ -291,7 +291,7 @@ std::vector<std::vector<FIDESlib::CKKS::Ciphertext>> encoder(PtWeights_GPU& weig
 		printMatrix(decryptGPUMatrix(GPUResult_Down, keys_.secretKey, ct_tokens, conf.numSlots, conf.blockSize), 2, 2, "Result_Down: ", false);
 
 	if (TIMING) {
-		cudaDeviceSynchronize();
+		hipDeviceSynchronize();
 		end_gpu = std::chrono::high_resolution_clock::now();
 		std::cout << "PCMM took: " << (std::chrono::duration_cast<std::chrono::milliseconds>(end_gpu - start_gpu).count()) << " ms." << std::endl;
 		start_gpu = std::chrono::high_resolution_clock::now();
@@ -322,7 +322,7 @@ std::vector<std::vector<FIDESlib::CKKS::Ciphertext>> encoder(PtWeights_GPU& weig
 		printMatrix(decryptGPUMatrix(GPUResult_Down, keys_.secretKey, ct_tokens, conf.numSlots, conf.blockSize), 2, 2, "LN: ", false);
 
 	if (TIMING) {
-		cudaDeviceSynchronize();
+		hipDeviceSynchronize();
 		end_gpu = std::chrono::high_resolution_clock::now();
 		std::cout << "LN took: " << (std::chrono::duration_cast<std::chrono::milliseconds>(end_gpu - start_gpu).count()) << " ms." << std::endl;
 		start_gpu = std::chrono::high_resolution_clock::now();
@@ -467,7 +467,7 @@ void process_pretokenized_samples(const std::string& pretokenized_dir,
 			encryptMatrixtoGPU(embedding_path, tokens_gpu, publicKey, GPUcc, conf.numSlots, conf.blockSize, conf.rows, conf.cols, conf.level_matmul);
 
 			// Run inference
-			cudaDeviceSynchronize();
+			hipDeviceSynchronize();
 			auto start_gpu = std::chrono::high_resolution_clock::now();
 
 			tokens_gpu = encoder(weights_layer0, precomp_gpu, Tprecomp_gpu, tokens_gpu, masks, conf, 0);
@@ -476,7 +476,7 @@ void process_pretokenized_samples(const std::string& pretokenized_dir,
 			int32_t class_pred = classifier(
 			  cc, tokens_gpu, sk, ct_tokens_clone, precomp_gpu, weights_layer1, masks, conf.numSlots, conf.blockSize, conf.token_length, true, output_path, conf);
 
-			cudaDeviceSynchronize();
+			hipDeviceSynchronize();
 			auto end_gpu = std::chrono::high_resolution_clock::now();
 
 			tokens_gpu.clear();

@@ -24,7 +24,7 @@ class NegacyclicNTTTest : public FIDESlibParametrizedTest {};
 
 TEST_P(NegacyclicNTTTest, TestCpuNTT) {
 	int devcount = -1;
-	cudaGetDeviceCount(&devcount);
+	hipGetDeviceCount(&devcount);
 
 	std::vector<int> GPUs = devices;
 
@@ -39,7 +39,7 @@ TEST_P(NegacyclicNTTTest, TestCpuNTT) {
 	CudaCheckErrorMod;
 
 	for (int l : { 0 }) {
-		cudaSetDevice(GPUs[0]);
+		hipSetDevice(GPUs[0]);
 
 		std::vector<uint64_t> v1{ 1, 2, 3, 7, 5, 4, 3, 9 };
 		std::vector<uint64_t> v2{ 1, 2, 3, 7, 5, 4, 1, 2 };
@@ -126,7 +126,7 @@ TEST_P(NegacyclicNTTTest, TestCpuNTT) {
 
 TEST_P(NegacyclicNTTTest, TestCpuNTT_adapt_cyclic) {
 	int devcount = -1;
-	cudaGetDeviceCount(&devcount);
+	hipGetDeviceCount(&devcount);
 
 	std::vector<int> GPUs;
 	for (int i = 0; i < devcount; ++i)
@@ -145,7 +145,7 @@ TEST_P(NegacyclicNTTTest, TestCpuNTT_adapt_cyclic) {
 	CudaCheckErrorMod;
 
 	for (int l : { 0 }) {
-		cudaSetDevice(GPUs[0]);
+		hipSetDevice(GPUs[0]);
 
 		std::vector<uint64_t> v1{ 1, 2, 3, 7, 5, 4, 3, 9 };
 		std::vector<uint64_t> v2{ 1, 2, 3, 7, 5, 4, 1, 2 };
@@ -243,7 +243,7 @@ TEST_P(NegacyclicNTTTest, TestCpuNTT_adapt_cyclic) {
 
 TEST_P(NegacyclicNTTTest, TestCpuNTT2) {
 	int devcount = -1;
-	cudaGetDeviceCount(&devcount);
+	hipGetDeviceCount(&devcount);
 
 	std::vector<int> GPUs;
 	for (int i = 0; i < devcount; ++i)
@@ -260,7 +260,7 @@ TEST_P(NegacyclicNTTTest, TestCpuNTT2) {
 	CudaCheckErrorMod;
 
 	for (int l : { 0 }) {
-		cudaSetDevice(GPUs[0]);
+		hipSetDevice(GPUs[0]);
 
 		std::vector<uint64_t> v1{ 1, 2, 3, 7, 5, 4, 3, 9, 1, 2, 3, 7, 5, 4, 3, 9 };
 		std::vector<uint64_t> v2{ 1, 2, 3, 7, 5, 4, 1, 2, 1, 2, 3, 7, 5, 4, 3, 9 };
@@ -344,7 +344,7 @@ TEST_P(NegacyclicNTTTest, TestCpuNTT2) {
 
 TEST_P(NegacyclicNTTTest, TestCpuNTTBigMod) {
 	int devcount = -1;
-	cudaGetDeviceCount(&devcount);
+	hipGetDeviceCount(&devcount);
 
 	std::vector<int> GPUs;
 	for (int i = 0; i < devcount; ++i)
@@ -361,7 +361,7 @@ TEST_P(NegacyclicNTTTest, TestCpuNTTBigMod) {
 	CudaCheckErrorMod;
 
 	for (int l : { 0 }) {
-		cudaSetDevice(GPUs[0]);
+		hipSetDevice(GPUs[0]);
 
 		std::vector<uint64_t> v1{ 1, 2, 3, 7, 5, 4, 3, 9 };
 		std::vector<uint64_t> v2{ 1, 2, 3, 7, 5, 4, 1, 2 };
@@ -448,7 +448,7 @@ TEST_P(NegacyclicNTTTest, TestCpuNTTBigMod) {
 
 TEST_P(NegacyclicNTTTest, TestCpuNTTindependentOfN) {
 	int devcount = -1;
-	cudaGetDeviceCount(&devcount);
+	hipGetDeviceCount(&devcount);
 
 	std::vector<int> GPUs;
 	for (int i = 0; i < devcount; ++i)
@@ -463,7 +463,7 @@ TEST_P(NegacyclicNTTTest, TestCpuNTTindependentOfN) {
 	CudaCheckErrorMod;
 
 	for (int l : { 0 }) {
-		cudaSetDevice(GPUs[0]);
+		hipSetDevice(GPUs[0]);
 		FIDESlib::Stream s;
 		s.init();
 
@@ -552,12 +552,12 @@ TEST_P(NegacyclicNTTTest, TestCpuNTTindependentOfN) {
 		std::cout << "Compare with GPU\n";
 		FIDESlib::CKKS::Limb<uint64_t> limb(cc, GPUs[0], s, primeid);
 		limb.load(v2);
-		cudaDeviceSynchronize();
+		hipDeviceSynchronize();
 		limb.NTT();
 
 		std::vector<uint64_t> res_gpu(v2);
 		limb.store(res_gpu);
-		cudaDeviceSynchronize();
+		hipDeviceSynchronize();
 
 		nega_fft2_forPrime(res_cpu, false, primeid, 1000);
 
@@ -566,7 +566,7 @@ TEST_P(NegacyclicNTTTest, TestCpuNTTindependentOfN) {
 		FIDESlib::bit_reverse_vector(res_cpu);
 		limb.INTT();
 		limb.store(res_gpu);
-		cudaDeviceSynchronize();
+		hipDeviceSynchronize();
 		nega_fft2_forPrime(res_cpu, true, primeid, 1000);
 		ASSERT_EQ(res_cpu, v2);
 		ASSERT_EQ(res_cpu, res_gpu);

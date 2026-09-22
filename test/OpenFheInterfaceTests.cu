@@ -1,3 +1,4 @@
+#include "hip/hip_runtime.h"
 //
 // Created by carlosad on 29/04/24.
 //
@@ -538,7 +539,7 @@ TEST_P(OpenFHEInterfaceTest, ExtractContextShowPtMult) {
 		fideslibParams.batch = batch;
 		std::cout << "Batch " << batch << std::endl;
 		GPUcc.batch = batch;
-		cudaDeviceSynchronize();
+		hipDeviceSynchronize();
 		FIDESlib::CKKS::Ciphertext GPUct1(cc_);
 		FIDESlib::CKKS::Ciphertext GPUct2(cc_);
 		GPUct1.copy(GPUct1_);
@@ -679,7 +680,7 @@ TEST_P(OpenFHEInterfaceTest, ExtractContextShowPtMultSquareScale) {
 		fideslibParams.batch = batch;
 		std::cout << "Batch " << batch << std::endl;
 		GPUcc.batch = batch;
-		cudaDeviceSynchronize();
+		hipDeviceSynchronize();
 		FIDESlib::CKKS::Ciphertext GPUct1(cc_);
 		FIDESlib::CKKS::Ciphertext GPUct2(cc_);
 		GPUct1.copy(GPUct1_);
@@ -928,7 +929,7 @@ TEST_P(OpenFHEInterfaceTest, Mult) {
 			fideslibParams.batch = batch;
 			std::cout << "Batch " << batch << std::endl;
 			GPUcc.batch = batch;
-			cudaDeviceSynchronize();
+			hipDeviceSynchronize();
 
 			FIDESlib::CKKS::Ciphertext GPUct1(cc_);
 			GPUct1.copy(GPUct1_);
@@ -1011,7 +1012,7 @@ TEST_P(OpenFHEInterfaceTest, Square) {
 		FIDESlib::CKKS::Ciphertext GPUct1(cc_);
 		GPUct1.copy(GPUct1_);
 		GPUct1.square(false);
-		cudaDeviceSynchronize();
+		hipDeviceSynchronize();
 
 		FIDESlib::CKKS::RawCipherText raw_res1;
 		GPUct1.store(raw_res1);
@@ -1406,7 +1407,7 @@ TEST_P(OpenFHEInterfaceTest, ExtractContextShowPtMultAllLevels) {
 		fideslibParams.batch = batch;
 		std::cout << "Batch " << batch << std::endl;
 		GPUcc.batch = batch;
-		cudaDeviceSynchronize();
+		hipDeviceSynchronize();
 		FIDESlib::CKKS::Ciphertext GPUct1(cc_);
 		GPUct1.copy(GPUct1_);
 
@@ -2227,20 +2228,20 @@ TEST_P(OpenFHEBootstrapTest, ApproxModEval) {
 		raw1 = FIDESlib::CKKS::GetRawCipherText(cc, ctxtEnc);
 		GPUct1.load(raw1);
 		FIDESlib::CKKS::Ciphertext aux(cc_);
-		cudaDeviceSynchronize();
+		hipDeviceSynchronize();
 
 		aux.conjugate(GPUct1);
-		cudaDeviceSynchronize();
-		cudaDeviceSynchronize();
+		hipDeviceSynchronize();
+		hipDeviceSynchronize();
 		GPUct2.sub(GPUct1, aux);
-		cudaDeviceSynchronize();
+		hipDeviceSynchronize();
 		GPUct1.add(aux);
-		cudaDeviceSynchronize();
+		hipDeviceSynchronize();
 
 		GPUct2.multMonomial(3 * 2 * GPUcc.N / 4);
-		cudaDeviceSynchronize();
+		hipDeviceSynchronize();
 		// ctxt.copy(ctxtEncI);
-		cudaDeviceSynchronize();
+		hipDeviceSynchronize();
 		if (GPUcc.rescaleTechnique == CKKS::FIXEDMANUAL) {
 			GPUct1.rescale();
 			GPUct2.rescale();
@@ -2368,12 +2369,12 @@ TEST_P(OpenFHEBootstrapTest, ApproxModEval) {
 		fideslibParams.batch = batch;
 		std::cout << "Batch " << batch << std::endl;
 		GPUcc.batch = batch;
-		cudaDeviceSynchronize();
+		hipDeviceSynchronize();
 		FIDESlib::CKKS::Ciphertext GPUct1_(cc_);
 		FIDESlib::CKKS::Ciphertext GPUct2_(cc_);
 		GPUct1_.copy(GPUct1);
 		GPUct2_.copy(GPUct2);
-		cudaDeviceSynchronize();
+		hipDeviceSynchronize();
 
 		FIDESlib::CKKS::approxModReduction(GPUct1_, GPUct2_, kskEval, 1.0);
 
@@ -2558,7 +2559,7 @@ TEST_P(OpenFHEBootstrapTest, ApproxModEvalSparse) {
 			fideslibParams.batch = batch;
 			std::cout << "Batch " << batch << std::endl;
 			GPUcc.batch = batch;
-			cudaDeviceSynchronize();
+			hipDeviceSynchronize();
 			FIDESlib::CKKS::Ciphertext GPUct1(cc_);
 			GPUct1.copy(GPUct1_);
 
@@ -2874,7 +2875,7 @@ TEST_P(OpenFHEBootstrapTest, CoeffsToSlots) {
 		fideslibParams.batch = batch;
 		std::cout << "Batch " << batch << std::endl;
 		GPUcc.batch = batch;
-		cudaDeviceSynchronize();
+		hipDeviceSynchronize();
 		FIDESlib::CKKS::Ciphertext GPUct1(cc_);
 		GPUct1.copy(GPUct1_);
 
@@ -3001,7 +3002,7 @@ TEST_P(OpenFHEBootstrapTest, SlotsToCoeffs) {
 		fideslibParams.batch = batch;
 		std::cout << "Batch " << batch << std::endl;
 		GPUcc.batch = batch;
-		cudaDeviceSynchronize();
+		hipDeviceSynchronize();
 		FIDESlib::CKKS::Ciphertext GPUct1(cc_);
 		GPUct1.copy(GPUct1_);
 
@@ -3204,14 +3205,14 @@ TEST_P(OpenFHEBootstrapTest, OpenFHEBootstrap) {
 	FIDESlib::CKKS::Ciphertext GPUct_o(cc_, raw1);
 
 	if constexpr (true) {
-		cudaDeviceSynchronize();
+		hipDeviceSynchronize();
 		std::cout << "Initial ";
 		for (auto& j : GPUct_o.c0.GPU) {
-			cudaSetDevice(j.device);
+			hipSetDevice(j.device);
 			for (auto& i : j.limb)
 				SWITCH(i, printThisLimb(1));
 		}
-		cudaDeviceSynchronize();
+		hipDeviceSynchronize();
 	}
 	CudaCheckErrorMod;
 
@@ -3220,13 +3221,13 @@ TEST_P(OpenFHEBootstrapTest, OpenFHEBootstrap) {
 		std::cout << "Batch " << batch << std::endl;
 
 		GPUcc.batch = batch;
-		cudaDeviceSynchronize();
+		hipDeviceSynchronize();
 
 		FIDESlib::CKKS::Ciphertext GPUct1(cc_);
 		for (int i = 0; i < 1; ++i) {
 			GPUct1.copy(GPUct_o);
 
-			cudaDeviceSynchronize();
+			hipDeviceSynchronize();
 
 			FIDESlib::CKKS::Bootstrap(GPUct1, slots, false);
 		}
@@ -3314,14 +3315,14 @@ TEST_P(OpenFHEBootstrapTest, OpenFHEBootstrapManualPrescale) {
 	FIDESlib::CKKS::Ciphertext GPUct_o(cc_, raw1);
 
 	if constexpr (true) {
-		cudaDeviceSynchronize();
+		hipDeviceSynchronize();
 		std::cout << "Initial ";
 		for (auto& j : GPUct_o.c0.GPU) {
-			cudaSetDevice(j.device);
+			hipSetDevice(j.device);
 			for (auto& i : j.limb)
 				SWITCH(i, printThisLimb(1));
 		}
-		cudaDeviceSynchronize();
+		hipDeviceSynchronize();
 	}
 	CudaCheckErrorMod;
 
@@ -3330,12 +3331,12 @@ TEST_P(OpenFHEBootstrapTest, OpenFHEBootstrapManualPrescale) {
 		std::cout << "Batch " << batch << std::endl;
 
 		GPUcc.batch = batch;
-		cudaDeviceSynchronize();
+		hipDeviceSynchronize();
 
 		FIDESlib::CKKS::Ciphertext GPUct1(cc_);
 		for (int i = 0; i < 4; ++i) {
 			GPUct1.copy(GPUct_o);
-			cudaDeviceSynchronize();
+			hipDeviceSynchronize();
 			GPUct1.dropToLevel(1);
 			GPUct1.multScalar(CKKS::GetPreScaleFactor(cc_, slots), true);
 			FIDESlib::CKKS::Bootstrap(GPUct1, slots, true);
@@ -3441,7 +3442,7 @@ TEST_P(OpenFHEBootstrapTest, OpenFHEBootstrapLT) {
 		std::cout << "Batch " << batch << std::endl;
 		GPUcc.batch = batch;
 
-		cudaDeviceSynchronize();
+		hipDeviceSynchronize();
 
 		FIDESlib::CKKS::Ciphertext GPUct1(cc_);
 
@@ -3557,7 +3558,7 @@ TEST_P(OpenFHEBootstrapTest, OpenFHEBootstrapDense) {
 		fideslibParams.batch = batch;
 		std::cout << "Batch " << batch << std::endl;
 		GPUcc.batch = batch;
-		cudaDeviceSynchronize();
+		hipDeviceSynchronize();
 
 		FIDESlib::CKKS::Ciphertext GPUct1(cc_);
 		GPUct1.copy(GPUct1_);
@@ -3571,9 +3572,9 @@ TEST_P(OpenFHEBootstrapTest, OpenFHEBootstrapDense) {
 			for (int j = 0; j < 10; ++j) {
 				CKKS::Ciphertext GPUct_aux(cc_);
 				GPUct_aux.copy(GPUct1);
-				cudaDeviceSynchronize();
+				hipDeviceSynchronize();
 				FIDESlib::CKKS::Bootstrap(GPUct_aux, slots, false);
-				cudaDeviceSynchronize();
+				hipDeviceSynchronize();
 				GPUct_aux.dropToLevel(2);
 				GPUct1.copy(GPUct_aux);
 			}

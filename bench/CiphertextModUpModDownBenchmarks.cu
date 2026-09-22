@@ -9,7 +9,7 @@
 namespace FIDESlib::Benchmarks {
 BENCHMARK_DEFINE_F(GeneralFixture, CiphertextModUp)(benchmark::State& state) {
 	int devcount = -1;
-	cudaGetDeviceCount(&devcount);
+	hipGetDeviceCount(&devcount);
 
 	std::vector<int> GPUs = generalTestParams.GPUs;
 
@@ -47,7 +47,7 @@ BENCHMARK_DEFINE_F(GeneralFixture, CiphertextModUp)(benchmark::State& state) {
 
 BENCHMARK_DEFINE_F(GeneralFixture, CiphertextModDown)(benchmark::State& state) {
 	int devcount = -1;
-	cudaGetDeviceCount(&devcount);
+	hipGetDeviceCount(&devcount);
 
 	std::vector<int> GPUs = generalTestParams.GPUs;
 
@@ -84,7 +84,7 @@ BENCHMARK_DEFINE_F(GeneralFixture, CiphertextModDown)(benchmark::State& state) {
 
 BENCHMARK_DEFINE_F(GeneralFixture, CiphertextModUpModDown)(benchmark::State& state) {
 	int devcount = -1;
-	cudaGetDeviceCount(&devcount);
+	hipGetDeviceCount(&devcount);
 
 	std::vector<int> GPUs = generalTestParams.GPUs;
 

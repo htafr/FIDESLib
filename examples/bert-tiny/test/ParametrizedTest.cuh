@@ -1,3 +1,4 @@
+#include "hip/hip_runtime.h"
 //
 // Created by oscar on 10/10/24.
 //

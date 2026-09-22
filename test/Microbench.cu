@@ -1,3 +1,4 @@
+#include "hip/hip_runtime.h"
 //
 // Created by carlosad on 25/3/26.
 //
@@ -20,9 +21,9 @@
 #if 0
 #define CUDA_CHECK(call)                                                                                \
 	do {                                                                                                \
-		cudaError_t err__ = (call);                                                                     \
-		if (err__ != cudaSuccess) {                                                                     \
-			fprintf(stderr, "CUDA error %s at %s:%d\n", cudaGetErrorString(err__), __FILE__, __LINE__); \
+		hipError_t err__ = (call);                                                                     \
+		if (err__ != hipSuccess) {                                                                     \
+			fprintf(stderr, "CUDA error %s at %s:%d\n", hipGetErrorString(err__), __FILE__, __LINE__); \
 			std::exit(EXIT_FAILURE);                                                                    \
 		}                                                                                               \
 	} while (0)
@@ -623,10 +624,10 @@ __global__ void int64_modmult(int* out, int iters) {
 #define bench(func)                                                                                                       \
 	{                                                                                                                     \
 		int device = 0;                                                                                                   \
-		CUDA_CHECK(cudaSetDevice(device));                                                                                \
+		CUDA_CHECK(hipSetDevice(device));                                                                                \
                                                                                                                           \
-		cudaDeviceProp prop;                                                                                              \
-		CUDA_CHECK(cudaGetDeviceProperties(&prop, device));                                                               \
+		hipDeviceProp_t prop;                                                                                              \
+		CUDA_CHECK(hipGetDeviceProperties(&prop, device));                                                               \
                                                                                                                           \
 		int iters			= 100'000;                                                                                    \
 		int threadsPerBlock = 128;                                                                                        \
@@ -640,27 +641,27 @@ __global__ void int64_modmult(int* out, int iters) {
 		printf("Loop iters per thread: %d, OPS_PER_ITER=%d\n", iters, OPS_PER_ITER);                                      \
                                                                                                                           \
 		int* d_out = nullptr;                                                                                             \
-		CUDA_CHECK(cudaMalloc(&d_out, numThreads * sizeof(int)));                                                         \
+		CUDA_CHECK(hipMalloc(&d_out, numThreads * sizeof(int)));                                                         \
                                                                                                                           \
 		func<<<blocks, threadsPerBlock>>>(d_out, iters);                                                                  \
-		CUDA_CHECK(cudaGetLastError());                                                                                   \
-		CUDA_CHECK(cudaDeviceSynchronize());                                                                              \
+		CUDA_CHECK(hipGetLastError());                                                                                   \
+		CUDA_CHECK(hipDeviceSynchronize());                                                                              \
                                                                                                                           \
-		cudaEvent_t start, stop;                                                                                          \
-		CUDA_CHECK(cudaEventCreate(&start));                                                                              \
-		CUDA_CHECK(cudaEventCreate(&stop));                                                                               \
+		hipEvent_t start, stop;                                                                                          \
+		CUDA_CHECK(hipEventCreate(&start));                                                                              \
+		CUDA_CHECK(hipEventCreate(&stop));                                                                               \
                                                                                                                           \
-		CUDA_CHECK(cudaEventRecord(start));                                                                               \
+		CUDA_CHECK(hipEventRecord(start));                                                                               \
 		func<<<blocks, threadsPerBlock>>>(d_out, iters);                                                                  \
-		CUDA_CHECK(cudaGetLastError());                                                                                   \
-		CUDA_CHECK(cudaEventRecord(stop));                                                                                \
-		CUDA_CHECK(cudaEventSynchronize(stop));                                                                           \
+		CUDA_CHECK(hipGetLastError());                                                                                   \
+		CUDA_CHECK(hipEventRecord(stop));                                                                                \
+		CUDA_CHECK(hipEventSynchronize(stop));                                                                           \
                                                                                                                           \
 		float ms = 0.0f;                                                                                                  \
-		CUDA_CHECK(cudaEventElapsedTime(&ms, start, stop));                                                               \
+		CUDA_CHECK(hipEventElapsedTime(&ms, start, stop));                                                               \
                                                                                                                           \
-		CUDA_CHECK(cudaEventDestroy(start));                                                                              \
-		CUDA_CHECK(cudaEventDestroy(stop));                                                                               \
+		CUDA_CHECK(hipEventDestroy(start));                                                                              \
+		CUDA_CHECK(hipEventDestroy(stop));                                                                               \
                                                                                                                           \
 		double seconds	   = ms * 1e-3;                                                                                   \
 		double total_iters = static_cast<double>(iters) * static_cast<double>(numThreads);                                \
@@ -676,11 +677,11 @@ __global__ void int64_modmult(int* out, int iters) {
 		printf("Per-SM integer throughput: %.3e ops/s per SM\n", iops_per_sm);                                            \
                                                                                                                           \
 		int sample = 0;                                                                                                   \
-		CUDA_CHECK(cudaMemcpy(&sample, d_out + 1, sizeof(int), cudaMemcpyDeviceToHost));                                  \
+		CUDA_CHECK(hipMemcpy(&sample, d_out + 1, sizeof(int), hipMemcpyDeviceToHost));                                  \
 		printf("Sample output[0] = %d\n", sample);                                                                        \
                                                                                                                           \
-		CUDA_CHECK(cudaFree(d_out));                                                                                      \
-		CUDA_CHECK(cudaDeviceReset());                                                                                    \
+		CUDA_CHECK(hipFree(d_out));                                                                                      \
+		CUDA_CHECK(hipDeviceReset());                                                                                    \
 	}
 
 TEST(Microbench, int32) {

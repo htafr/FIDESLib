@@ -10,7 +10,7 @@
 namespace FIDESlib::Benchmarks {
 BENCHMARK_DEFINE_F(FIDESlibFixture, RNSPolyAdd)(benchmark::State& state) {
 	int devcount = -1;
-	cudaGetDeviceCount(&devcount);
+	hipGetDeviceCount(&devcount);
 
 	std::vector<int> GPUs;
 	for (int i = 0; i < devcount; ++i)
@@ -41,7 +41,7 @@ BENCHMARK_DEFINE_F(FIDESlibFixture, RNSPolyAdd)(benchmark::State& state) {
 
 BENCHMARK_DEFINE_F(FIDESlibFixture, RNSPolyAddContextLimbCount)(benchmark::State& state) {
 	int devcount = -1;
-	cudaGetDeviceCount(&devcount);
+	hipGetDeviceCount(&devcount);
 
 	std::vector<int> GPUs;
 	for (int i = 0; i < devcount; ++i)
@@ -66,7 +66,7 @@ BENCHMARK_DEFINE_F(FIDESlibFixture, RNSPolyAddContextLimbCount)(benchmark::State
 
 BENCHMARK_DEFINE_F(FIDESlibFixture, RNSPolyMultiAdd)(benchmark::State& state) {
 	int devcount = -1;
-	cudaGetDeviceCount(&devcount);
+	hipGetDeviceCount(&devcount);
 
 	std::vector<int> GPUs;
 	for (int i = 0; i < devcount; ++i)
@@ -98,7 +98,7 @@ BENCHMARK_DEFINE_F(FIDESlibFixture, RNSPolyMultiAdd)(benchmark::State& state) {
 
 BENCHMARK_DEFINE_F(FIDESlibFixture, RNSPolyMultiAddContextLimbCount)(benchmark::State& state) {
 	int devcount = -1;
-	cudaGetDeviceCount(&devcount);
+	hipGetDeviceCount(&devcount);
 
 	std::vector<int> GPUs;
 	for (int i = 0; i < devcount; ++i)
@@ -125,7 +125,7 @@ BENCHMARK_DEFINE_F(FIDESlibFixture, RNSPolyMultiAddContextLimbCount)(benchmark::
 
 BENCHMARK_DEFINE_F(FIDESlibFixture, RNSPolySub)(benchmark::State& state) {
 	int devcount = -1;
-	cudaGetDeviceCount(&devcount);
+	hipGetDeviceCount(&devcount);
 
 	std::vector<int> GPUs;
 	for (int i = 0; i < devcount; ++i)
@@ -155,7 +155,7 @@ BENCHMARK_DEFINE_F(FIDESlibFixture, RNSPolySub)(benchmark::State& state) {
 
 BENCHMARK_DEFINE_F(FIDESlibFixture, RNSPolySubContextLimbCount)(benchmark::State& state) {
 	int devcount = -1;
-	cudaGetDeviceCount(&devcount);
+	hipGetDeviceCount(&devcount);
 
 	std::vector<int> GPUs;
 	for (int i = 0; i < devcount; ++i)

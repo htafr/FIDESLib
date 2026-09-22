@@ -85,45 +85,45 @@ void CudaNvtxStop(const std::string msg, NVTX_CATEGORIES cat) {
 
 int getNumDevices() {
 	int d;
-	cudaGetDeviceCount(&d);
+	hipGetDeviceCount(&d);
 	return d;
 };
 
 void CudaHostSync() {
-	cudaDeviceSynchronize();
+	hipDeviceSynchronize();
 }
 
-template <bool capture> void run_in_graph(cudaGraphExec_t& exec, Stream& s, std::function<void()> run) {
-	cudaGraph_t graph;
+template <bool capture> void run_in_graph(hipGraphExec_t& exec, Stream& s, std::function<void()> run) {
+	hipGraph_t graph;
 	if constexpr (capture) {
-		cudaStreamBeginCapture(s.ptr(), cudaStreamCaptureModeRelaxed);
+		hipStreamBeginCapture(s.ptr(), hipStreamCaptureModeRelaxed);
 		CudaCheckErrorModNoSync;
 	}
 	run();
 	if constexpr (capture) {
-		cudaStreamEndCapture(s.ptr(), &graph);
+		hipStreamEndCapture(s.ptr(), &graph);
 		if (!exec) {
-			cudaGraphInstantiateWithFlags(&exec, graph, cudaGraphInstantiateFlagUseNodePriority);
+			hipGraphInstantiateWithFlags(&exec, graph, hipGraphInstantiateFlagUseNodePriority);
 			// cudaGraphInstantiate(&exec, graph, NULL, NULL, 0);
 			CudaCheckErrorModNoSync;
 		} else {
-			if (cudaGraphExecUpdate(exec, graph, NULL) != cudaSuccess) {
+			if (hipGraphExecUpdate(exec, graph, NULL) != hipSuccess) {
 				CudaCheckErrorModNoSync;
 				// only instantiate a new graph if update fails
-				cudaGraphExecDestroy(exec);
-				cudaGraphInstantiateWithFlags(&exec, graph, cudaGraphInstantiateFlagUseNodePriority);
+				hipGraphExecDestroy(exec);
+				hipGraphInstantiateWithFlags(&exec, graph, hipGraphInstantiateFlagUseNodePriority);
 				// cudaGraphInstantiate(&exec, graph, NULL, NULL, 0);
 				CudaCheckErrorModNoSync;
 			}
 		}
-		cudaGraphDestroy(graph);
-		cudaGraphLaunch(exec, s.ptr());
+		hipGraphDestroy(graph);
+		hipGraphLaunch(exec, s.ptr());
 	}
 }
 
-template void run_in_graph<false>(cudaGraphExec_t& exec, Stream& s, std::function<void()> run);
+template void run_in_graph<false>(hipGraphExec_t& exec, Stream& s, std::function<void()> run);
 
-template void run_in_graph<true>(cudaGraphExec_t& exec, Stream& s, std::function<void()> run);
+template void run_in_graph<true>(hipGraphExec_t& exec, Stream& s, std::function<void()> run);
 
 /*
 	void Stream::wait(const Event &ev) const {
@@ -133,16 +133,16 @@ template void run_in_graph<true>(cudaGraphExec_t& exec, Stream& s, std::function
 void Stream::capture_begin() {
 	CudaCheckErrorMod;
 	std::cout << "Hello capture" << std::endl;
-	cudaStreamCaptureStatus cap;
-	cudaStreamIsCapturing(ptr(), &cap);
+	hipStreamCaptureStatus cap;
+	hipStreamIsCapturing(ptr(), &cap);
 
 	CudaCheckErrorMod;
-	if (cap == cudaStreamCaptureStatusNone) {
+	if (cap == hipStreamCaptureStatusNone) {
 		std::cout << "None" << std::endl;
-		cudaStreamBeginCapture(ptr(), cudaStreamCaptureModeGlobal);
-	} else if (cap == cudaStreamCaptureStatusActive) {
+		hipStreamBeginCapture(ptr(), hipStreamCaptureModeGlobal);
+	} else if (cap == hipStreamCaptureStatusActive) {
 		std::cout << "Fail: activo" << std::endl;
-	} else if (cap == cudaStreamCaptureStatusInvalidated) {
+	} else if (cap == hipStreamCaptureStatusInvalidated) {
 		std::cout << "Fail: invalidado" << std::endl;
 	} else {
 		std::cout << "Fail" << std::endl;
@@ -151,18 +151,18 @@ void Stream::capture_begin() {
 }
 
 void Stream::capture_end() {
-	cudaGraph_t graph;
-	cudaStreamEndCapture(ptr(), &graph);
+	hipGraph_t graph;
+	hipStreamEndCapture(ptr(), &graph);
 	CudaCheckErrorMod;
-	cudaGraphExec_t graphExec;
-	cudaGraphInstantiate(&graphExec, graph, nullptr, nullptr, 0);
+	hipGraphExec_t graphExec;
+	hipGraphInstantiate(&graphExec, graph, nullptr, nullptr, 0);
 	CudaCheckErrorMod;
-	cudaGraphDestroy(graph);
+	hipGraphDestroy(graph);
 	CudaCheckErrorMod;
-	cudaGraphLaunch(graphExec, 0);
-	cudaGraphExecDestroy(graphExec);
+	hipGraphLaunch(graphExec, 0);
+	hipGraphExecDestroy(graphExec);
 
-	cudaStreamSynchronize(0);
+	hipStreamSynchronize(0);
 }
 
 void Stream::record(bool external) {
@@ -174,7 +174,7 @@ void Stream::record(bool external) {
 	// cudaEventCreate(&ev, cudaEventDisableTiming);
 	assert(ptr_ != nullptr);
 	assert(ev != nullptr);
-	cudaEventRecordWithFlags(ev, ptr_, external ? cudaEventRecordExternal : cudaEventRecordDefault);
+	hipEventRecordWithFlags(ev, ptr_, external ? hipEventRecordExternal : hipEventRecordDefault);
 	updated = true;
 #endif
 }
@@ -184,7 +184,7 @@ void Stream::wait_recorded(const Stream& s) {
 		return;
 #if !DISABLE_STREAMS
 	assert(s.updated);
-	cudaStreamWaitEvent(ptr_, s.ev);
+	hipStreamWaitEvent(ptr_, s.ev);
 	this->updated = false;
 #endif
 }
@@ -201,18 +201,18 @@ void Stream::wait(Stream& s, bool external) {
 	if (!s.updated) {
 		assert(!external); // Has to be recorded in the origin graph
 		CudaCheckErrorModNoSync;
-		cudaEventRecordWithFlags(s.ev, s.ptr_, cudaEventRecordDefault);
+		hipEventRecordWithFlags(s.ev, s.ptr_, hipEventRecordDefault);
 		s.updated = true;
 		CudaCheckErrorModNoSync;
 	}
 	CudaCheckErrorModNoSync;
-	cudaStreamWaitEvent(ptr_, s.ev, external ? cudaEventWaitExternal : cudaEventWaitDefault);
+	hipStreamWaitEvent(ptr_, s.ev, external ? cudaEventWaitExternal : cudaEventWaitDefault);
 	this->updated = false;
 #endif
 	CudaCheckErrorModNoSync;
 }
 
-void Stream::wait(cudaStream_t s) {
+void Stream::wait(hipStream_t s) {
 
 #if !DISABLE_STREAMS
 	// CudaCheckErrorModNoSync;
@@ -221,12 +221,12 @@ void Stream::wait(cudaStream_t s) {
 	assert(ptr_ != nullptr);
 	assert(ev != nullptr);
 	CudaCheckErrorModNoSync;
-	cudaEventRecordWithFlags(ev, s, cudaEventRecordDefault);
+	hipEventRecordWithFlags(ev, s, hipEventRecordDefault);
 	updated = false;
 	CudaCheckErrorModNoSync;
 
 	CudaCheckErrorModNoSync;
-	cudaStreamWaitEvent(ptr_, ev, cudaEventWaitDefault);
+	hipStreamWaitEvent(ptr_, ev, cudaEventWaitDefault);
 #endif
 	CudaCheckErrorModNoSync;
 }
@@ -235,15 +235,15 @@ int low	 = -1;
 int high = -1;
 
 constexpr int POOL_SIZE = 37;
-cudaStream_t stream_pool[MAXD][POOL_SIZE];
+hipStream_t stream_pool[MAXD][POOL_SIZE];
 
 bool initPool() {
 	int devs;
-	cudaGetDeviceCount(&devs);
+	hipGetDeviceCount(&devs);
 	for (int j = 0; j < devs; j++) {
-		cudaSetDevice(j);
+		hipSetDevice(j);
 		for (int i = 0; i < POOL_SIZE; ++i) {
-			cudaStreamCreateWithFlags(&stream_pool[j][i], 0);
+			hipStreamCreateWithFlags(&stream_pool[j][i], 0);
 		}
 	}
 	return true;
@@ -255,7 +255,7 @@ void Stream::init(int priority) {
 	static int assigner_idx[MAXD] = { 0 };
 	if (ptr_) {
 		// free[ptr]++;
-		cudaEventDestroy(ev);
+		hipEventDestroy(ev);
 		// cudaStreamDestroy(ptr_);
 		ptr_ = nullptr;
 		ev	 = nullptr;
@@ -263,13 +263,13 @@ void Stream::init(int priority) {
 
 #if !DISABLE_STREAMS
 	if (high == -1) {
-		cudaDeviceGetStreamPriorityRange(&low, &high);
+		hipDeviceGetStreamPriorityRange(&low, &high);
 	}
 
 	// int prio = low + priority * ((high - low - 1)) / 100;
 
 	int dev;
-	cudaGetDevice(&dev);
+	hipGetDevice(&dev);
 
 	ptr_ = stream_pool[dev][assigner_idx[dev]];
 	assigner_idx[dev] += 1;
@@ -278,8 +278,8 @@ void Stream::init(int priority) {
 	// cudaStreamCreateWithPriority(&ptr_, 0 /*cudaStreamNonBlocking*/, prio);
 	//   cudaStreamCreateWithFlags(&ptr, cudaStreamNonBlocking);
 
-	cudaEventCreateWithFlags(&ev, cudaEventDisableTiming);
-	cudaEventCreate(&ev, cudaEventDisableTiming);
+	hipEventCreateWithFlags(&ev, hipEventDisableTiming);
+	hipEventCreate(&ev, hipEventDisableTiming);
 #else
 	ptr_ = nullptr;
 	ev	 = nullptr;
@@ -302,7 +302,7 @@ Stream::~Stream() {
 		ptr_ = nullptr;
 	}
 	if (ev) {
-		cudaEventDestroy(ev);
+		hipEventDestroy(ev);
 		ev = nullptr;
 	}
 }
@@ -314,15 +314,15 @@ Stream::Stream(Stream&& s) noexcept : ptr_(s.ptr_), ev(s.ev) {
 	s.ev   = nullptr;
 }
 
-std::vector<cudaDeviceProp> GPUprop;
+std::vector<hipDeviceProp_t> GPUprop;
 
 void initGPUprop() {
 	if (GPUprop.empty()) {
 		int count = 0;
-		cudaGetDeviceCount(&count);
+		hipGetDeviceCount(&count);
 		for (int i = 0; i < count; ++i) {
 			GPUprop.emplace_back();
-			cudaGetDeviceProperties(&GPUprop.back(), i);
+			hipGetDeviceProperties(&GPUprop.back(), i);
 
 			std::cout << "GPU " << i << ": " << GPUprop[i].name << "\n SMs: " << GPUprop[i].multiProcessorCount
 					  << ", SharedMem: " << GPUprop[i].sharedMemPerMultiprocessor / 1024l << " KB, Blocks/SM: " << GPUprop[i].maxBlocksPerMultiProcessor
@@ -341,7 +341,7 @@ std::map<int, std::vector<void*>> size_to_memory[8];
 FIDESlib::Stream s[8];
 
 // void* GPUmalloc(int id, int bytes, cudaStream_t stream, FIDESlib::CKKS::Context& cc) {
-void* GPUmalloc(int id, int bytes, cudaStream_t stream, bool cache) {
+void* GPUmalloc(int id, int bytes, hipStream_t stream, bool cache) {
 	void* ptr = nullptr;
 
 	uint64_t MBs = 1024;
@@ -365,7 +365,7 @@ void* GPUmalloc(int id, int bytes, cudaStream_t stream, bool cache) {
 		CudaCheckErrorModNoSync;
 		if (free_limb.empty()) {
 			uint64_t* base;
-			cudaMallocAsync(&base, MBs * 1024 * 1024, s[id].ptr());
+			hipMallocAsync(&base, MBs * 1024 * 1024, s[id].ptr());
 
 			mempool_lock[id].lock();
 			for (uint32_t i = 0; i < MBs * 1024 * 1024; i += bytes) {
@@ -378,7 +378,7 @@ void* GPUmalloc(int id, int bytes, cudaStream_t stream, bool cache) {
 		if (stream != nullptr) {
 			s[id].record();
 			CudaCheckErrorModNoSync;
-			cudaStreamWaitEvent(stream, s[id].ev);
+			hipStreamWaitEvent(stream, s[id].ev);
 		}
 
 		CudaCheckErrorModNoSync;
@@ -394,19 +394,19 @@ void* GPUmalloc(int id, int bytes, cudaStream_t stream, bool cache) {
 
 	// std::cout << bytes << std::endl;
 	if (0) {
-		cudaMalloc(&ptr, bytes);
+		hipMalloc(&ptr, bytes);
 	} else if (1) {
-		cudaMallocAsync(&ptr, bytes, 0);
+		hipMallocAsync(&ptr, bytes, 0);
 	} else {
 		if (size_to_memory[id][bytes].empty()) {
-			cudaSetDevice(id);
-			cudaMallocAsync(&ptr, bytes, stream);
+			hipSetDevice(id);
+			hipMallocAsync(&ptr, bytes, stream);
 		} else {
 			mempool_lock[id].lock();
 			if (size_to_memory[id][bytes].empty()) {
 				mempool_lock[id].unlock();
-				cudaSetDevice(id);
-				cudaMallocAsync(&ptr, bytes, stream);
+				hipSetDevice(id);
+				hipMallocAsync(&ptr, bytes, stream);
 			} else {
 				ptr = size_to_memory[id][bytes].back();
 				size_to_memory[id][bytes].pop_back();
@@ -434,7 +434,7 @@ void CUDART_CB streamCallback(void* userData) {
 	delete p;
 }
 
-void GPUfree(void* ptr, int id, int bytes, cudaStream_t stream, bool cache) {
+void GPUfree(void* ptr, int id, int bytes, hipStream_t stream, bool cache) {
 
 	// uint64_t MBs;
 
@@ -468,15 +468,15 @@ void GPUfree(void* ptr, int id, int bytes, cudaStream_t stream, bool cache) {
 	}
 
 	if (0) {
-		cudaFree(ptr);
+		hipFree(ptr);
 	} else if (1) {
-		cudaFreeAsync(ptr, stream);
+		hipFreeAsync(ptr, stream);
 	} else {
 		auto* p	   = new pointerdata;
 		p->id	   = id;
 		p->bytes   = bytes;
 		p->pointer = ptr;
-		cudaLaunchHostFunc(stream, streamCallback, p);
+		hipLaunchHostFunc(stream, streamCallback, p);
 	}
 }
 
