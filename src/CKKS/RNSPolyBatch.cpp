@@ -147,7 +147,7 @@ void RNSPoly::LTdotProductPtBatch(std::vector<RNSPoly*>& out, const std::vector<
 						}
 					}
 
-					cudaSetDevice(cc.GPUid[i]);
+					hipSetDevice(cc.GPUid[i]);
 
 					outs[0]->s.wait(out[0]->GPU[i].s);
 					pts[0]->s.wait(pt[0]->GPU[i].s);

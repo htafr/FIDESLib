@@ -60,7 +60,7 @@ RNSPoly::RNSPoly(ContextData& context, int level, bool single_malloc, bool def_s
 
 	// #pragma omp parallel for num_threads(context.GPUid.size())
 	for (size_t i = 0u; i < context.GPUid.size(); ++i) {
-		cudaSetDevice(context.GPUid.at(i));
+		hipSetDevice(context.GPUid.at(i));
 		GPU.emplace_back(context, uid, &this->level, i, def_stream);
 	}
 	assert(level >= -1 && level <= cc.L);
@@ -132,8 +132,8 @@ void RNSPoly::generateSpecialLimbs(const bool zero_out, const bool for_communica
 			for (size_t g = 0; g < GPU.size(); ++g) {
 				// std::cout << GPU[g].DECOMPlimbptr[i].data << " " << cpu_ptr.data() << " " << GPU[g].DECOMPmeta.at(i).size() * sizeof(void*) << " "
 				//		  << cudaMemcpyHostToDevice << " " << GPU[g].s.ptr() << std::endl;
-				cudaSetDevice(cc.GPUid[g]);
-				cudaMemcpyAsync(GPU[g].SPECIALlimbptr.data, cpu_ptr.data(), GPU[g].SPECIALmeta.size() * sizeof(void*), cudaMemcpyHostToDevice, GPU[g].s.ptr());
+				hipSetDevice(cc.GPUid[g]);
+				hipMemcpyAsync(GPU[g].SPECIALlimbptr.data, cpu_ptr.data(), GPU[g].SPECIALmeta.size() * sizeof(void*), hipMemcpyHostToDevice, GPU[g].s.ptr());
 				CudaCheckErrorMod;
 			}
 		}
@@ -171,9 +171,9 @@ void RNSPoly::generateDecompAndDigit(bool iskey) {
 				for (size_t g = 0; g < GPU.size(); ++g) {
 					// std::cout << GPU[g].DECOMPlimbptr[i].data << " " << cpu_ptr.data() << " " << GPU[g].DECOMPmeta.at(i).size() * sizeof(void*) << " "
 					//		  << cudaMemcpyHostToDevice << " " << GPU[g].s.ptr() << std::endl;
-					cudaSetDevice(cc.GPUid[g]);
-					cudaMemcpyAsync(
-					  GPU[g].DECOMPlimbptr[i].data, cpu_ptr.data(), GPU[g].DECOMPmeta.at(i).size() * sizeof(void*), cudaMemcpyHostToDevice, GPU[g].s.ptr());
+					hipSetDevice(cc.GPUid[g]);
+					hipMemcpyAsync(
+					  GPU[g].DECOMPlimbptr[i].data, cpu_ptr.data(), GPU[g].DECOMPmeta.at(i).size() * sizeof(void*), hipMemcpyHostToDevice, GPU[g].s.ptr());
 					CudaCheckErrorMod;
 				}
 			}
@@ -193,7 +193,7 @@ void RNSPoly::store(std::vector<std::vector<uint64_t>>& data) {
 	data.resize(level + 1);
 	for (size_t i = 0; i < data.size(); ++i) {
 		// auto& rec = cc.meta[cc.limbGPUid[i].x][cc.limbGPUid[i].y];
-		cudaSetDevice(GPU[cc.limbGPUid[i].x].device);
+		hipSetDevice(GPU[cc.limbGPUid[i].x].device);
 		SWITCH(GPU[cc.limbGPUid[i].x].limb[cc.limbGPUid[i].y], store_convert(data[i]));
 	}
 }
@@ -316,9 +316,9 @@ void RNSPoly::modup() {
 void RNSPoly::sync() {
 	for (auto& i : GPU) {
 		for (auto& j : i.limb) {
-			cudaStreamSynchronize(STREAM(j).ptr());
+			hipStreamSynchronize(STREAM(j).ptr());
 		}
-		cudaStreamSynchronize(i.s.ptr());
+		hipStreamSynchronize(i.s.ptr());
 	}
 }
 
@@ -830,7 +830,7 @@ void RNSPoly::copyShallow(const RNSPoly& poly) {
 void RNSPoly::dropToLevel(int level) {
 	if (0 && GPU.at(0).bufferLIMB == nullptr) {
 		for (auto& g : GPU) {
-			cudaSetDevice(g.device);
+			hipSetDevice(g.device);
 			int limbSize = g.getLimbSize(level);
 			while ((int)g.limb.size() > limbSize) {
 				g.dropLimb();
@@ -871,7 +871,7 @@ void RNSPoly::load(const std::vector<std::vector<uint64_t>>& data, const std::ve
 	for (int i = 0; i < limbsize; ++i) {
 		// std::cout << "Load limb" << i << " into gpu " << cc.limbGPUid[i].x << std::endl;
 		assert(moduli[i] == cc.prime.at(i).p);
-		cudaSetDevice(GPU[cc.limbGPUid[i].x].device);
+		hipSetDevice(GPU[cc.limbGPUid[i].x].device);
 		SWITCH(GPU[cc.limbGPUid[i].x].limb[cc.limbGPUid[i].y], load_convert(data[i]));
 	}
 
@@ -879,7 +879,7 @@ void RNSPoly::load(const std::vector<std::vector<uint64_t>>& data, const std::ve
 		generateSpecialLimbs(false, false);
 	for (int i = limbsize; i < (int)data.size(); ++i) {
 		for (auto& j : GPU) {
-			cudaSetDevice(j.device);
+			hipSetDevice(j.device);
 			assert(moduli[i] == cc.specialPrime.at(i - limbsize).p);
 			SWITCH(j.SPECIALlimb[i - limbsize], load_convert(data[i]));
 		}
@@ -906,7 +906,7 @@ void RNSPoly::loadConstant(const std::vector<std::vector<uint64_t>>& data, const
 	assert(level == limbsize - 1);
 	for (int i = 0; i < limbsize; ++i) {
 		assert(moduli[i] == cc.prime.at(i).p);
-		cudaSetDevice(GPU[cc.limbGPUid[i].x].device);
+		hipSetDevice(GPU[cc.limbGPUid[i].x].device);
 		SWITCH(GPU[cc.limbGPUid[i].x].limb[cc.limbGPUid[i].y], load_convert(data[i]));
 	}
 
@@ -918,7 +918,7 @@ void RNSPoly::loadConstant(const std::vector<std::vector<uint64_t>>& data, const
 		for (size_t j = 0; j < GPU.size(); ++j) {
 			for (size_t k = 0; k < cc.splitSpecialMeta.at(j).size(); ++k) {
 				if (cc.specialPrime.at(cc.splitSpecialMeta.at(j).at(k).id - cc.L - 1).p == moduli[i]) {
-					cudaSetDevice(GPU[j].device);
+					hipSetDevice(GPU[j].device);
 					SWITCH(GPU[j].SPECIALlimb[k], load_convert(data[i]));
 				}
 			}
@@ -1190,7 +1190,7 @@ RNSPoly& RNSPoly::modup_ksk_moddown_mgpu(const KeySwitchingKey& key, const bool 
 		if (MEMCPY_PEER) {
 			for (auto& i : signals) {
 				for (uint32_t j = 0; j < cc.GPUid.size(); ++j) {
-					cudaSetDevice(cc.GPUid[j]);
+					hipSetDevice(cc.GPUid[j]);
 
 					for (uint32_t k = 0; k < cc.GPUid.size(); ++k) {
 						i[j][k].first = i[j][k].first + 4;
