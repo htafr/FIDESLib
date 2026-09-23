@@ -1,16 +1,16 @@
-#include <cuda_runtime.h>
+#include <hip/hip_runtime.h>
 #include <iostream>
 
 int main() {
 	int deviceCount, device;
 	int gpuDeviceCount = 0;
-	cudaDeviceProp properties;
-	cudaError_t cudaResultCode = cudaGetDeviceCount(&deviceCount);
-	if (cudaResultCode != cudaSuccess)
+	hipDeviceProp_t properties;
+	hipError_t hipResultCode = hipGetDeviceCount(&deviceCount);
+	if (hipResultCode != hipSuccess)
 		deviceCount = 0;
 	/* machines with no GPUid can still report one emulation device */
 	for (device = 0; device < deviceCount; ++device) {
-		cudaGetDeviceProperties(&properties, device);
+		hipGetDeviceProperties(&properties, device);
 
 		if (properties.major != 9999) { /* 9999 means emulation only */
 			++gpuDeviceCount;
