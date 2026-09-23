@@ -24,24 +24,24 @@ void CudaNvtxStart(const std::string msg, NVTX_CATEGORIES cat = FUNCTION, int va
 void CudaNvtxStop(const std::string msg = "", NVTX_CATEGORIES cat = FUNCTION);
 
 class CudaNvtxRange {
-	// const std::string msg;
-	// const NVTX_CATEGORIES cat;
-	// bool valid = true;
-	//
-	//  public:
-	// explicit CudaNvtxRange(const std::string msg, NVTX_CATEGORIES cat = FUNCTION, int val = 0) : msg(msg), cat(cat) {
-	// 	CudaNvtxStart(msg, cat, val);
-	// }
-	//
-	// CudaNvtxRange(CudaNvtxRange&& r) noexcept : msg(r.msg), cat(r.cat) {
-	// 	this->valid = r.valid;
-	// 	r.valid		= false;
-	// }
-	//
-	// ~CudaNvtxRange() {
-	// 	if (valid)
-	// 		CudaNvtxStop(msg, cat);
-	// }
+	const std::string msg;
+	const NVTX_CATEGORIES cat;
+	bool valid = true;
+
+	 public:
+	explicit CudaNvtxRange(const std::string msg, NVTX_CATEGORIES cat = FUNCTION, int val = 0) : msg(msg), cat(cat) {
+		CudaNvtxStart(msg, cat, val);
+	}
+
+	CudaNvtxRange(CudaNvtxRange&& r) noexcept : msg(r.msg), cat(r.cat) {
+		this->valid = r.valid;
+		r.valid		= false;
+	}
+
+	~CudaNvtxRange() {
+		if (valid)
+			CudaNvtxStop(msg, cat);
+	}
 };
 
 int getNumDevices();
