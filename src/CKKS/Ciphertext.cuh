@@ -48,7 +48,7 @@ class Ciphertext {
 	/** @brief Identifier string for NVTX profiling. */
 	static constexpr const char* loc{ "Ciphertext" };
 	// /** @brief NVTX range object for profiling this class' methods. */
-	// CudaNvtxRange my_range;
+	CudaNvtxRange my_range;
 
   public:
 	/** @brief Identifier for the key associated with this ciphertext. */
